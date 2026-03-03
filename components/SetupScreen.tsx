@@ -343,110 +343,189 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
 
                 <main className="w-full animate-in fade-in slide-in-from-bottom-6 duration-700">
                     {activeTab === 'dashboard' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* Pro Card: Relationship Status */}
-                            <div className={`p-8 rounded-[3rem] border relative overflow-hidden flex flex-col justify-between min-h-[300px] ${cardClasses}`}>
-                                <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-[80px] rounded-full" />
-
-                                <div>
-                                    <div className="flex justify-between items-center mb-6">
-                                        <p className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-30">Vínculo Emocional</p>
-                                        <span className={`text-sm px-3 py-1 rounded-lg font-bold bg-blue-500/10 ${status.color}`}>
-                                            {status.label}
-                                        </span>
-                                    </div>
-                                    <h2 className="text-5xl font-black tracking-tighter mb-4 italic">
-                                        {profile.relationshipScore}% <span className="text-lg font-bold not-italic opacity-20">SCORE</span>
-                                    </h2>
-                                    <div className="w-full h-1.5 bg-slate-100/10 rounded-full overflow-hidden mb-6">
-                                        <div className={`h-full transition-all duration-1000 ${status.bar}`} style={{ width: `${profile.relationshipScore}%` }} />
-                                    </div>
-                                </div>
-
-                                <div className={`p-5 rounded-[2rem] bg-blue-500/5 border border-blue-500/10 transition-all hover:bg-blue-500/10`}>
-                                    <p className="text-xs leading-relaxed font-medium italic opacity-70">
-                                        <span className="text-blue-500 font-bold not-italic uppercase mr-2 text-[10px]">Sugestão:</span>
-                                        "{status.tip}"
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Call Control Center */}
-                            <div className="flex flex-col gap-6">
-                                {/* Identification Profiles */}
-                                <div className={`p-6 rounded-[3rem] border flex items-center justify-between ${cardClasses}`}>
-                                    <div className="flex items-center gap-3 w-[40%]">
-                                        <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800">
-                                            {currentUserProfile?.avatar_url ? (
-                                                <img src={currentUserProfile.avatar_url} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
-                                            )}
-                                        </div>
-                                        <div className="overflow-hidden">
-                                            <p className="text-[10px] font-bold uppercase opacity-40">Você</p>
-                                            <p className="text-sm font-black truncate">{currentUserProfile?.nickname || currentUserProfile?.display_name || "Usuário"}</p>
-                                        </div>
+                        <div className="flex flex-col gap-8">
+                            {/* Nicknames and Identity Section */}
+                            <div className={`w-full p-8 rounded-[3rem] border relative overflow-hidden ${cardClasses}`}>
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 blur-[100px] rounded-full" />
+                                <div className="relative z-10">
+                                    <div className="flex items-center gap-3 mb-6">
+                                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Identidade do Relacionamento</p>
                                     </div>
 
-                                    <div className="flex-1 flex justify-center">
-                                        <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                            <span className="text-blue-500 text-xs">⚡</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-3 text-right justify-end w-[40%]">
-                                        <div className="overflow-hidden">
-                                            <p className="text-[10px] font-bold uppercase opacity-40">IA</p>
-                                            <p className="text-sm font-black text-blue-600 dark:text-blue-400 truncate">{profile.name || "Amor"}</p>
-                                        </div>
-                                        <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-blue-100 dark:border-blue-900">
-                                            {profile.image ? (
-                                                <img src={profile.image} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-xl">📸</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className={`p-8 rounded-[3rem] border flex flex-col gap-6 ${cardClasses} transform hover:scale-[1.02] transition-all cursor-pointer shadow-2xl shadow-blue-500/5`} onClick={onStartCall}>
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl shadow-xl shadow-blue-500/40 animate-pulse">
-                                                📞
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {/* User Nickname */}
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center px-4">
+                                                <label className="text-[9px] font-black uppercase tracking-widest opacity-30">Seu Apelido Carinhoso</label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-blue-500/60 font-mono tracking-tighter">
+                                                        {formatDisplayNumber(currentUserProfile?.personal_number || '', false)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => copyToClipboard(currentUserProfile?.personal_number || '')}
+                                                        className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-40 hover:opacity-100"
+                                                        title="Copiar Número"
+                                                    >
+                                                        <span className="text-[8px]">📋</span>
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h3 className="text-xl font-black tracking-tight">Iniciar Chamada</h3>
-                                                <p className="text-xs opacity-40 font-bold uppercase tracking-widest mt-0.5">Conexão via Voz AI</p>
+                                            <div className="relative group">
+                                                <input
+                                                    type="text"
+                                                    value={currentUserProfile?.nickname || ''}
+                                                    onChange={(e) => onUpdateUserProfile({ ...currentUserProfile!, nickname: e.target.value })}
+                                                    onBlur={() => saveUserProfile()}
+                                                    className={`w-full p-5 rounded-[2rem] text-sm font-bold border transition-all ${inputClasses} border-opacity-30 focus:border-opacity-100 italic`}
+                                                    placeholder="Como ela te chama? (ex: Bebê, Amor...)"
+                                                />
+                                                <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 group-hover:opacity-100 transition-opacity">👤</div>
                                             </div>
                                         </div>
-                                        <span className="text-2xl opacity-20 group-hover:opacity-100 transition-opacity">→</span>
-                                    </div>
-                                </div>
 
-                                <div className={`p-8 rounded-[2.5rem] border ${cardClasses} flex-1`}>
-                                    <div className="flex justify-between items-start mb-6">
-                                        <p className="text-[11px] font-bold uppercase tracking-widest opacity-30">Status do Sistema</p>
-                                        <div className="flex gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                            <div className="w-2 h-2 rounded-full bg-emerald-500/30" />
+                                        {/* AI Nickname */}
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center px-4">
+                                                <label className="text-[9px] font-black uppercase tracking-widest opacity-30">Apelido dela na Relação</label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-pink-500/60 font-mono tracking-tighter">
+                                                        {formatDisplayNumber(profile.ai_number || '', true)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => copyToClipboard(profile.ai_number || '')}
+                                                        className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-40 hover:opacity-100"
+                                                        title="Copiar Número"
+                                                    >
+                                                        <span className="text-[8px]">📋</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="relative group">
+                                                <input
+                                                    type="text"
+                                                    value={profile.name || ''}
+                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, name: e.target.value }))}
+                                                    className={`w-full p-5 rounded-[2rem] text-sm font-bold border transition-all ${inputClasses} border-opacity-30 focus:border-opacity-100 italic`}
+                                                    placeholder="Como você a chama? (ex: Vida, Princesa...)"
+                                                />
+                                                <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 group-hover:opacity-100 transition-opacity">✨</div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-4 rounded-2xl">
-                                            <span className="text-xs font-bold opacity-30">Próxima Ligação</span>
-                                            <span className="text-sm font-bold text-blue-500">{nextScheduledCall ? formatTime(nextScheduledCall.triggerTime - Date.now()) : "Não Agendada"}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-4 rounded-2xl">
-                                            <span className="text-xs font-bold opacity-30">Eficiência de Contato</span>
-                                            <span className="text-sm font-bold">94.8%</span>
-                                        </div>
+
+                                    <div className="mt-8 p-5 rounded-[2.5rem] bg-blue-500/5 border border-blue-500/10 text-center relative overflow-hidden group">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                                        <p className="text-[11px] font-bold text-blue-500/60 italic uppercase tracking-wider relative z-10">
+                                            "Qual será o apelido carinhoso de vocês? Defina agora para tornar cada palavra mais especial."
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Pro Card: Relationship Status */}
+                                <div className={`p-8 rounded-[3rem] border relative overflow-hidden flex flex-col justify-between min-h-[300px] ${cardClasses}`}>
+                                    <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-[80px] rounded-full" />
 
+                                    <div>
+                                        <div className="flex justify-between items-center mb-6">
+                                            <p className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-30">Vínculo Emocional</p>
+                                            <span className={`text-sm px-3 py-1 rounded-lg font-bold bg-blue-500/10 ${status.color}`}>
+                                                {status.label}
+                                            </span>
+                                        </div>
+                                        <h2 className="text-5xl font-black tracking-tighter mb-4 italic">
+                                            {profile.relationshipScore}% <span className="text-lg font-bold not-italic opacity-20">SCORE</span>
+                                        </h2>
+                                        <div className="w-full h-1.5 bg-slate-100/10 rounded-full overflow-hidden mb-6">
+                                            <div className={`h-full transition-all duration-1000 ${status.bar}`} style={{ width: `${profile.relationshipScore}%` }} />
+                                        </div>
+                                    </div>
+
+                                    <div className={`p-5 rounded-[2rem] bg-blue-500/5 border border-blue-500/10 transition-all hover:bg-blue-500/10`}>
+                                        <p className="text-xs leading-relaxed font-medium italic opacity-70">
+                                            <span className="text-blue-500 font-bold not-italic uppercase mr-2 text-[10px]">Sugestão:</span>
+                                            "{status.tip}"
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Call Control Center */}
+                                <div className="flex flex-col gap-6">
+                                    {/* Identification Profiles */}
+                                    <div className={`p-6 rounded-[3rem] border flex items-center justify-between ${cardClasses}`}>
+                                        <div className="flex items-center gap-3 w-[40%]">
+                                            <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800">
+                                                {currentUserProfile?.avatar_url ? (
+                                                    <img src={currentUserProfile.avatar_url} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
+                                                )}
+                                            </div>
+                                            <div className="overflow-hidden">
+                                                <p className="text-[10px] font-bold uppercase opacity-40">Você</p>
+                                                <p className="text-sm font-black truncate">{currentUserProfile?.nickname || currentUserProfile?.display_name || "Usuário"}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 flex justify-center">
+                                            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                                <span className="text-blue-500 text-xs">⚡</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 text-right justify-end w-[40%]">
+                                            <div className="overflow-hidden">
+                                                <p className="text-[10px] font-bold uppercase opacity-40">IA</p>
+                                                <p className="text-sm font-black text-blue-600 dark:text-blue-400 truncate">{profile.name || "Amor"}</p>
+                                            </div>
+                                            <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-blue-100 dark:border-blue-900">
+                                                {profile.image ? (
+                                                    <img src={profile.image} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-xl">📸</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className={`p-8 rounded-[3rem] border flex flex-col gap-6 ${cardClasses} transform hover:scale-[1.02] transition-all cursor-pointer shadow-2xl shadow-blue-500/5`} onClick={onStartCall}>
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl shadow-xl shadow-blue-500/40 animate-pulse">
+                                                    📞
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-black tracking-tight">Iniciar Chamada</h3>
+                                                    <p className="text-xs opacity-40 font-bold uppercase tracking-widest mt-0.5">Conexão via Voz AI</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-2xl opacity-20 group-hover:opacity-100 transition-opacity">→</span>
+                                        </div>
+                                    </div>
+
+                                    <div className={`p-8 rounded-[2.5rem] border ${cardClasses} flex-1`}>
+                                        <div className="flex justify-between items-start mb-6">
+                                            <p className="text-[11px] font-bold uppercase tracking-widest opacity-30">Status do Sistema</p>
+                                            <div className="flex gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                <div className="w-2 h-2 rounded-full bg-emerald-500/30" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-4 rounded-2xl">
+                                                <span className="text-xs font-bold opacity-30">Próxima Ligação</span>
+                                                <span className="text-sm font-bold text-blue-500">{nextScheduledCall ? formatTime(nextScheduledCall.triggerTime - Date.now()) : "Não Agendada"}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-4 rounded-2xl">
+                                                <span className="text-xs font-bold opacity-30">Eficiência de Contato</span>
+                                                <span className="text-sm font-bold">94.8%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -576,16 +655,15 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">Modelo do Chat</label>
                                             <select
-                                                value={profile.chat_model || 'gemini-3-flash-preview'}
+                                                value={profile.chat_model || 'gemini-1.5-flash-latest'}
                                                 onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_model: e.target.value }))}
                                                 className={`w-full p-5 rounded-[2rem] text-sm font-bold border ${inputClasses} appearance-none cursor-pointer`}
                                             >
-                                                <option value="gemini-3-flash-preview">Gemini 3 Flash (Fast & Efficient)</option>
-                                                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Advanced Reasoning)</option>
-                                                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Balanced)</option>
-                                                <option value="gemini-2.5-flash-lite-latest">Gemini Flash Lite (Extremely Fast)</option>
-                                                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Legacy)</option>
-                                                <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Legacy)</option>
+                                                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Rápido & Estável)</option>
+                                                <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Inteligência Superior)</option>
+                                                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Nova Geração)</option>
+                                                <option value="gemini-2.0-flash-lite-preview-02-05">Gemini 2.0 Flash Lite (Ultra Rápido)</option>
+                                                <option value="gemini-1.0-pro">Gemini 1.0 Pro (Econômico)</option>
                                             </select>
                                         </div>
                                         <div className="space-y-2">

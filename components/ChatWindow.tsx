@@ -124,7 +124,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
 
     const handleAiResponse = async (userMsg: string, currentHistory: ChatMessage[]) => {
         const finalKey = (chatApiKey || apiKey || "").trim();
-        const finalModel = chatModel || 'gemini-3-flash-preview';
+        const finalModel = chatModel || 'gemini-1.5-flash-latest';
 
         if (!finalKey) {
             setError("Chave API do Gemini não configurada.");
