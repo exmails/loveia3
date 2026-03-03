@@ -9,7 +9,257 @@ interface MemoryHistorySectionProps {
     isDark: boolean;
 }
 
-type SubTab = 'status' | 'memory' | 'history' | 'personality' | 'user_profile' | 'strategy' | 'external';
+type SubTab = 'status' | 'memory' | 'history' | 'personality' | 'user_profile' | 'strategy' | 'external' | 'recognition';
+
+// ─── Category metadata ───────────────────────────────────────────────────────
+const CATEGORY_META: Record<string, { icon: string; color: string; bg: string; label: string }> = {
+    comportamento: { icon: '🔄', color: 'text-blue-500', bg: 'bg-blue-500/10 border-blue-500/20', label: 'Comportamento' },
+    emocao: { icon: '💓', color: 'text-rose-500', bg: 'bg-rose-500/10 border-rose-500/20', label: 'Emoção' },
+    ciume: { icon: '😤', color: 'text-orange-500', bg: 'bg-orange-500/10 border-orange-500/20', label: 'Ciúme' },
+    humor: { icon: '😄', color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', label: 'Humor' },
+    habito: { icon: '📅', color: 'text-violet-500', bg: 'bg-violet-500/10 border-violet-500/20', label: 'Hábito' },
+    preferencia: { icon: '⭐', color: 'text-yellow-500', bg: 'bg-yellow-500/10 border-yellow-500/20', label: 'Preferência' },
+    personalidade: { icon: '🧬', color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', label: 'Personalidade' },
+    comunicacao: { icon: '💬', color: 'text-cyan-500', bg: 'bg-cyan-500/10 border-cyan-500/20', label: 'Comunicação' },
+};
+
+const getCategoryMeta = (cat: string) =>
+    CATEGORY_META[cat?.toLowerCase()] ?? { icon: '🪞', color: 'text-slate-500', bg: 'bg-slate-500/10 border-slate-500/20', label: cat || 'Geral' };
+
+const getScoreColor = (score: number) => {
+    if (score >= 5) return { bar: 'bg-emerald-500', text: 'text-emerald-500' };
+    if (score >= 2) return { bar: 'bg-blue-500', text: 'text-blue-500' };
+    if (score >= 0) return { bar: 'bg-amber-500', text: 'text-amber-500' };
+    return { bar: 'bg-rose-500', text: 'text-rose-500' };
+};
+
+// ─── RecognitionTab Component ─────────────────────────────────────────────────
+interface RecognitionTabProps {
+    phrases: any[];
+    isDark: boolean;
+    cardClasses: string;
+    itemClasses: string;
+    borderClass: string;
+    deletingId: string | null;
+    onDelete: (id: string) => Promise<void>;
+}
+
+const RecognitionTab: React.FC<RecognitionTabProps> = ({
+    phrases, isDark, cardClasses, itemClasses, borderClass, deletingId, onDelete
+}) => {
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
+
+    // Group by category
+    const grouped = phrases.reduce((acc: Record<string, any[]>, p) => {
+        const key = p.category?.toLowerCase() || 'geral';
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(p);
+        return acc;
+    }, {});
+
+    if (phrases.length === 0) {
+        return (
+            <div className={`p-20 rounded-[3rem] border ${cardClasses} flex flex-col items-center justify-center text-center gap-6 min-h-[400px] relative overflow-hidden`}>
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 to-pink-500/5 pointer-events-none" />
+                <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-5xl shadow-2xl">🪞</div>
+                <div>
+                    <h3 className="text-xl font-black italic tracking-tighter uppercase mb-2">Espelho Vazio</h3>
+                    <p className="text-xs font-bold opacity-30 uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                        A IA ainda não registrou frases de reconhecimento de personalidade.<br />
+                        Faça chamadas de voz para começar a construir seu perfil.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-8">
+            {/* Header */}
+            <div className={`p-8 rounded-[2.5rem] border relative overflow-hidden ${cardClasses}`}>
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-500/5 via-pink-500/5 to-transparent pointer-events-none" />
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative z-10">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-pink-600 flex items-center justify-center text-xl">🪞</div>
+                            <div>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-violet-500">Reconhecimento de Personalidade</h3>
+                                <p className="text-[9px] font-bold opacity-30 uppercase tracking-widest">Frases capturadas pelo histórico de voz</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+                            <span className="text-[9px] font-black uppercase tracking-widest opacity-40">{phrases.length} frases registradas</span>
+                        </div>
+                        <div className={`flex gap-1 p-1 rounded-xl ${isDark ? 'bg-white/5' : 'bg-slate-100'} border ${borderClass}`}>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${viewMode === 'list' ? 'bg-white text-violet-600 shadow-sm' : 'opacity-40 hover:opacity-70'}`}
+                            >Lista</button>
+                            <button
+                                onClick={() => setViewMode('grouped')}
+                                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${viewMode === 'grouped' ? 'bg-white text-violet-600 shadow-sm' : 'opacity-40 hover:opacity-70'}`}
+                            >Grupos</button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Score summary bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 relative z-10">
+                    {Object.entries(grouped).slice(0, 4).map(([cat, items]) => {
+                        const meta = getCategoryMeta(cat);
+                        return (
+                            <div key={cat} className={`p-4 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5' : 'bg-white border-slate-100'} text-center`}>
+                                <div className="text-2xl mb-1">{meta.icon}</div>
+                                <p className="text-[9px] font-black uppercase tracking-widest opacity-40">{meta.label}</p>
+                                <p className={`text-lg font-black ${meta.color}`}>{(items as any[]).length}</p>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Phrases */}
+            {viewMode === 'list' ? (
+                <div className="space-y-4">
+                    {phrases.map((phrase, idx) => {
+                        const meta = getCategoryMeta(phrase.category);
+                        const scoreColors = getScoreColor(phrase.score ?? 0);
+                        const isExpanded = expandedId === phrase.id;
+                        const maxScore = 10;
+                        const scorePercent = Math.min(100, Math.max(0, ((phrase.score ?? 0) + maxScore) / (maxScore * 2) * 100));
+
+                        return (
+                            <div
+                                key={phrase.id}
+                                className={`p-6 rounded-[2rem] border relative overflow-hidden transition-all hover:border-violet-500/30 group ${cardClasses}`}
+                                style={{ animationDelay: `${idx * 40}ms` }}
+                            >
+                                <div className="absolute top-0 right-0 w-20 h-20 bg-violet-500/5 blur-3xl rounded-full pointer-events-none" />
+
+                                <div className="flex items-start gap-4 relative z-10">
+                                    {/* Category badge */}
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 border ${meta.bg}`}>
+                                        {meta.icon}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        {/* Phrase text */}
+                                        <button
+                                            onClick={() => setExpandedId(isExpanded ? null : phrase.id)}
+                                            className="text-left w-full"
+                                        >
+                                            <p className={`text-sm font-bold leading-relaxed italic tracking-tight mb-3 ${isDark ? 'text-white/90' : 'text-slate-800'}`}>
+                                                "{phrase.recognition_phrase}"
+                                            </p>
+                                        </button>
+
+                                        {/* Meta row */}
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <span className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${meta.bg} ${meta.color}`}>
+                                                {meta.label}
+                                            </span>
+                                            <span className={`text-[9px] font-black uppercase tracking-widest ${scoreColors.text}`}>
+                                                Score: {phrase.score >= 0 ? '+' : ''}{phrase.score ?? 0}
+                                            </span>
+                                            <span className="text-[8px] font-mono opacity-20">
+                                                {phrase.created_at ? new Date(phrase.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                                            </span>
+                                            {phrase.last_used_at && (
+                                                <span className="text-[8px] font-bold opacity-20 uppercase">
+                                                    Último uso: {new Date(phrase.last_used_at).toLocaleDateString('pt-BR')}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Score bar */}
+                                        <div className="mt-3 flex items-center gap-3">
+                                            <div className="flex-1 h-1.5 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                                                <div
+                                                    className={`h-full transition-all duration-700 ${scoreColors.bar}`}
+                                                    style={{ width: `${scorePercent}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[9px] font-black font-mono opacity-30 w-10 text-right">
+                                                {scorePercent.toFixed(0)}%
+                                            </span>
+                                        </div>
+
+                                        {/* Expanded details */}
+                                        {isExpanded && phrase.engagement_phrase && (
+                                            <div className={`mt-4 p-4 rounded-2xl border ${itemClasses}`}>
+                                                <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Frase de Engajamento</p>
+                                                <p className="text-xs font-medium italic opacity-70">"{phrase.engagement_phrase}"</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Delete button */}
+                                    <button
+                                        onClick={() => onDelete(phrase.id)}
+                                        disabled={deletingId === phrase.id}
+                                        className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400' : 'bg-red-50 hover:bg-red-100 text-red-400'} ${deletingId === phrase.id ? 'animate-spin' : ''}`}
+                                        title="Remover frase"
+                                    >
+                                        {deletingId === phrase.id ? '⟳' : '×'}
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                /* Grouped view */
+                <div className="space-y-8">
+                    {Object.entries(grouped).map(([cat, catPhrases]) => {
+                        const meta = getCategoryMeta(cat);
+                        return (
+                            <div key={cat} className={`p-8 rounded-[2.5rem] border relative overflow-hidden ${cardClasses}`}>
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl border ${meta.bg}`}>{meta.icon}</div>
+                                    <div>
+                                        <h4 className={`text-xs font-black uppercase tracking-widest ${meta.color}`}>{meta.label}</h4>
+                                        <p className="text-[8px] font-bold opacity-30 uppercase">{(catPhrases as any[]).length} frases registradas</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {(catPhrases as any[]).map((phrase) => {
+                                        const scoreColors = getScoreColor(phrase.score ?? 0);
+                                        return (
+                                            <div key={phrase.id} className={`p-5 rounded-[1.5rem] border flex items-start gap-4 group transition-all hover:border-violet-500/20 ${itemClasses}`}>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-sm font-bold italic leading-relaxed mb-2 ${isDark ? 'text-white/80' : 'text-slate-700'}`}>
+                                                        "{phrase.recognition_phrase}"
+                                                    </p>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest ${scoreColors.text}`}>
+                                                            {phrase.score >= 0 ? '+' : ''}{phrase.score ?? 0} pts
+                                                        </span>
+                                                        <span className="text-[8px] font-mono opacity-20">
+                                                            {phrase.created_at ? new Date(phrase.created_at).toLocaleDateString('pt-BR') : ''}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => onDelete(phrase.id)}
+                                                    disabled={deletingId === phrase.id}
+                                                    className={`shrink-0 w-7 h-7 rounded-xl flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 ${isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-400'}`}
+                                                >×</button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const MemoryHistorySection: React.FC<MemoryHistorySectionProps> = ({ user, profile, currentUserProfile, isDark }) => {
     const [subTab, setSubTab] = useState<SubTab>('status');
@@ -23,6 +273,8 @@ export const MemoryHistorySection: React.FC<MemoryHistorySectionProps> = ({ user
     const [strategyLogs, setStrategyLogs] = useState<any[]>([]);
     const [externalInteractions, setExternalInteractions] = useState<any[]>([]);
     const [callHistory, setCallHistory] = useState<any[]>([]);
+    const [recognitionPhrases, setRecognitionPhrases] = useState<any[]>([]);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const cardClasses = isDark ? "bg-[#15181e] border-white/5" : "bg-white border-slate-100 shadow-sm";
     const itemClasses = isDark ? "bg-[#0b0c10] border-white/5" : "bg-slate-50 border-slate-200/50 shadow-sm";
@@ -60,6 +312,13 @@ export const MemoryHistorySection: React.FC<MemoryHistorySectionProps> = ({ user
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
             setCallHistory(data || []);
+        } else if (subTab === 'recognition') {
+            const { data } = await supabase
+                .from('ai_psychological_strategies')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('score', { ascending: false });
+            setRecognitionPhrases(data || []);
         }
         setLoading(false);
     };
@@ -85,6 +344,7 @@ export const MemoryHistorySection: React.FC<MemoryHistorySectionProps> = ({ user
                         { id: 'status', label: 'Status', icon: '📝', desc: 'Identidade' },
                         { id: 'memory', label: 'Cérebro', icon: '🧠', desc: 'Assuntos' },
                         { id: 'history', label: 'Voz', icon: '📞', desc: 'Chamadas' },
+                        { id: 'recognition', label: 'Perfil', icon: '🪞', desc: 'Reconhecimento' },
                         { id: 'personality', label: 'Ego', icon: '🎭', desc: 'Humor' },
                         { id: 'user_profile', label: 'Id', icon: '👤', desc: 'Análise' },
                         { id: 'strategy', label: 'Plano', icon: '⏰', desc: 'Rotina' },
@@ -541,6 +801,23 @@ export const MemoryHistorySection: React.FC<MemoryHistorySectionProps> = ({ user
                                     </div>
                                 ))}
                             </div>
+                        )}
+
+                        {subTab === 'recognition' && (
+                            <RecognitionTab
+                                phrases={recognitionPhrases}
+                                isDark={isDark}
+                                cardClasses={cardClasses}
+                                itemClasses={itemClasses}
+                                borderClass={borderClass}
+                                deletingId={deletingId}
+                                onDelete={async (id: string) => {
+                                    setDeletingId(id);
+                                    await supabase.from('ai_psychological_strategies').delete().eq('id', id);
+                                    setRecognitionPhrases(prev => prev.filter(p => p.id !== id));
+                                    setDeletingId(null);
+                                }}
+                            />
                         )}
 
                         {subTab === 'external' && (
