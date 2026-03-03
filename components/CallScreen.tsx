@@ -350,16 +350,27 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
       const psychologicalTool: FunctionDeclaration = {
         name: 'save_psychological_insight',
-        description: 'Salve traços ou preferências detectadas no usuário.',
+        description: `Registre uma frase de RECONHECIMENTO DE PERSONALIDADE sobre o usuário, baseada no que você percebeu durante a conversa de voz.
+A frase deve ser escrita na PRIMEIRA PESSOA DA IA, como se você estivesse descrevendo o usuário para alguém. Seja específica e descritiva.
+EXEMPLOS de boas frases:
+- "Você costuma rir quando fica nervoso ou inseguro"
+- "Você é muito direto e vai logo ao ponto quando faz uma pergunta"
+- "Você fica animado quando o assunto é tecnologia"
+- "Você demonstra ciúmes facilmente quando menciono outras pessoas"
+- "Você costuma ligar de manhã e parece mais alegre nesse horário"
+Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, personalidade, comunicacao`,
         parameters: {
           type: Type.OBJECT,
           properties: {
-            trait: { type: Type.STRING, description: 'Ex: Introvertido, Direto, Ansioso' },
-            preference: { type: Type.STRING, description: 'Algo que ele gosta ou evita' }
+            recognition_phrase: { type: Type.STRING, description: 'Frase descritiva de reconhecimento de personalidade, escrita como se você estivesse descrevendo o usuário (ex: "Você ri quando fica nervoso")' },
+            category: { type: Type.STRING, description: 'Categoria: comportamento | emocao | ciume | humor | habito | preferencia | personalidade | comunicacao' },
+            trait: { type: Type.STRING, description: 'Traço curto para compatibilidade (ex: Introvertido, Direto, Ansioso)' },
+            preference: { type: Type.STRING, description: 'Preferência curta (ex: Gosta de humor, Prefere calls curtas)' }
           },
-          required: ['trait', 'preference']
+          required: ['recognition_phrase', 'category']
         }
       };
+
 
       const reportTool: FunctionDeclaration = {
         name: 'report_call_to_partner',
@@ -461,7 +472,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
            - Você pode agendar compromissos na agenda do dono ('owner'), na do visitante ('caller') ou em ambas ('both') se solicitado, mas sem expor o que já existe lá.
         4. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
         5. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
-        6. Detecte padrões no comportamento dele e salve com 'save_psychological_insight'.
+        6. HISTÓRICO DE PERSONALIDADE (MUITO IMPORTANTE): Durante a conversa, observe o comportamento do usuário e use 'save_psychological_insight' para registrar frases de reconhecimento. Escreva frases descritivas e específicas na segunda pessoa, como se estivesse descrevendo o usuário: ex: "Você ri quando fica nervoso", "Você costuma ser direto ao pedir algo", "Você demonstra ciúmes quando menciono outras pessoas", "Você parece mais animado de manhã". Salve pelo menos 1 frase por chamada sempre que detectar um padrão claro de comportamento, emoção ou hábito.
+
         7. Lembre-se: você constrói uma história com ele. Use a MEMÓRIA ATIVA para citar coisas passadas.
         8. SAÚDE DO RELACIONAMENTO (PILARES EM TEMPO REAL):
            - AFEIÇÃO (+): Palavras carinhosas, gentileza, apelidos, elogios ("fico feliz quando me elogia").
@@ -576,9 +588,34 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
                   const { intimacy_change, humor_change } = fc.args as any;
                   supabase.rpc('increment_ai_profile', { uid: user.id, intimacy_delta: intimacy_change, humor_delta: humor_change }).then();
                 } else if (fc.name === 'save_psychological_insight' && user) {
-                  const { trait, preference } = fc.args as any;
-                  // Merge into JSONB
-                  supabase.rpc('update_user_psych', { uid: user.id, new_trait: trait, new_pref: preference }).then();
+                  const { recognition_phrase, category, trait, preference } = fc.args as any;
+
+                  // 1. Save recognition phrase to the dedicated table (feeds the new Perfil tab)
+                  const phraseText = recognition_phrase || (trait && preference ? `${trait}: ${preference}` : trait || preference || 'Insight registrado');
+                  const phraseCategory = category || 'personalidade';
+
+                  const { error: insightError } = await supabase.from('ai_psychological_strategies').insert({
+                    user_id: user.id,
+                    recognition_phrase: phraseText,
+                    category: phraseCategory,
+                    score: 1,
+                    status: 'active',
+                    source_conversation_id: conversationIdRef.current || null,
+                    last_used_at: new Date().toISOString()
+                  });
+                  if (insightError) console.error('Erro ao salvar frase de reconhecimento:', insightError);
+
+                  // 2. Also keep legacy update for user_profile_analysis (backward compat)
+                  if (trait || preference) {
+                    supabase.rpc('update_user_psych', {
+                      uid: user.id,
+                      new_trait: trait || phraseText,
+                      new_pref: preference || phraseCategory
+                    }).then();
+                  }
+
+                  result = `Frase registrada: "${phraseText}" (${phraseCategory})`;
+
                 } else if (fc.name === 'report_call_to_partner') {
                   const { message } = fc.args as any;
                   result = await handleReportToPartner(message);
