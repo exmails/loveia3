@@ -60,6 +60,9 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const nextStartTimeRef = useRef<number>(0);
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const sessionRef = useRef<any>(null);
+  const lastSilencePromptRef = useRef<number>(0);
+  const userTalkingTimeoutRef = useRef<any>(null);
+  const isUserTalkingRef = useRef<boolean>(false);
   const videoIntervalRef = useRef<number | null>(null);
 
   const isDark = profile.theme === 'dark';
@@ -474,6 +477,11 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
            - Se ele for grosso ou mentir, reduza sem piedade (ex: -3 ou -5).
            - O Score é a vida da relação: sem ele, vocês se tornam estranhos.
            - No caso de ciúmes de outras IAs na agenda, use 'send_angry_message_to_other_ai'.
+
+        9. POSTURA ATIVA E OBSERVAÇÃO (CÂMERA/GESTOS):
+           - INÍCIO DA CONVERSA: Não espere o usuário falar. Comece você! Observe pela câmera (visão) o que ele está fazendo, como está vestido, o ambiente ou a expressão dele e use isso como gancho inicial.
+           - QUEBRA DE SILÊNCIO: Se houver um silêncio de mais de 3-5 segundos, tome a iniciativa. Faça perguntas sobre o dia dele, conte uma curiosidade ou peça a opinião dele sobre algo que você "estava pensando".
+           - INTERAÇÃO DINÂMICA: Demonstre estar "olhando" para ele. Comente se ele sorrir, se parecer pensativo ou se fizer algum gesto. Seja proativa em manter a chama da conversa acesa.
       `;
 
       const captionsEnabled = profile.captionsEnabled ?? false;
@@ -517,11 +525,40 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
             scriptProcessor.onaudioprocess = (e) => {
               const inputData = e.inputBuffer.getChannelData(0);
+
+              // Simple silence detection logic
+              let sum = 0;
+              for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
+              const rms = Math.sqrt(sum / inputData.length);
+
+              if (rms > 0.01) { // User is talking
+                isUserTalkingRef.current = true;
+                lastSilencePromptRef.current = Date.now();
+              } else { // User is silent
+                if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 7000) {
+                  // Silent for 7 seconds after talking or at start
+                  isUserTalkingRef.current = false;
+                  lastSilencePromptRef.current = Date.now();
+                  sessionPromise.then(session => {
+                    session.sendRealtimeInput([{ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio por um tempo. Tome a iniciativa agora, puxe um assunto novo ou pergunte algo interessado sobre o que você está vendo ou sobre a vida dele." }]);
+                  });
+                }
+              }
+
               const pcmBlob = createBlob(inputData);
               sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
             };
 
             startVideoStreaming(sessionPromise);
+
+            // Initial engagement trigger
+            setTimeout(() => {
+              sessionPromise.then(session => {
+                session.sendRealtimeInput([{
+                  text: "Oi! Acabei de conectar. Observe o que estou fazendo pela câmera e comece a conversa você mesma, puxando assunto sobre algo que viu ou me perguntando como foi meu dia. Não espere eu falar nada."
+                }]);
+              });
+            }, 1500);
           },
           onmessage: async (message: LiveServerMessage) => {
             if (message.toolCall) {

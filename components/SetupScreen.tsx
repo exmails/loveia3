@@ -261,11 +261,9 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
 
             {/* Sidebar - Vertical Navigation (Permanent) */}
             <aside
-                onMouseEnter={() => setIsSidebarExpanded(true)}
-                onMouseLeave={() => setIsSidebarExpanded(false)}
-                className={`fixed left-0 top-0 h-full z-[70] transition-all duration-500 ease-in-out border-r shadow-2xl flex flex-col py-8 ${isSidebarExpanded ? 'w-56 md:w-64' : 'w-16 md:w-20'} ${isLight ? 'bg-white/95 border-slate-100' : 'bg-[#0b0c10]/95 border-white/5'} backdrop-blur-2xl`}
+                className={`fixed left-0 top-0 h-full z-[80] transition-all duration-500 ease-in-out border-r shadow-2xl flex flex-col py-8 ${isSidebarExpanded ? 'w-56 md:w-64' : 'w-16 md:w-20'} ${isLight ? 'bg-white/95 border-slate-100' : 'bg-[#0b0c10]/95 border-white/5'} backdrop-blur-2xl`}
             >
-                {/* Logo Section in Sidebar */}
+                {/* Expand/Collapse Toggle Layer - Desktop: Hover, Mobile/All: Click managed by buttons below */}
                 <div className={`mb-12 flex items-center gap-3 px-5 transition-all duration-500 ${isSidebarExpanded ? 'justify-start' : 'justify-center'}`}>
                     <div className="w-10 h-10 rounded-xl bg-blue-600 flex-shrink-0 flex items-center justify-center text-xl shadow-lg shadow-blue-500/20">⚡</div>
                     {isSidebarExpanded && (
@@ -287,7 +285,14 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                     ].map(tab => (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => {
+                                if (activeTab === tab.id) {
+                                    setIsSidebarExpanded(!isSidebarExpanded);
+                                } else {
+                                    setActiveTab(tab.id as any);
+                                    setIsSidebarExpanded(true);
+                                }
+                            }}
                             className={`w-full group relative flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-300 ${activeTab === tab.id
                                 ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
                                 : `opacity-40 hover:opacity-100 ${isLight ? 'hover:bg-slate-100' : 'hover:bg-white/5'}`
@@ -324,8 +329,16 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                 </div>
             </aside>
 
+            {/* Sidebar Overlay (Mobile Only) */}
+            {isSidebarExpanded && (
+                <div
+                    onClick={() => setIsSidebarExpanded(false)}
+                    className="md:hidden fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[75] animate-in fade-in duration-300"
+                />
+            )}
+
             {/* Main Content Area */}
-            <div className={`flex-1 flex flex-col transition-all duration-500 ${isSidebarExpanded ? 'ml-56 md:ml-64' : 'ml-16 md:ml-20'}`}>
+            <div className={`flex-1 flex flex-col transition-all duration-500 ${isSidebarExpanded ? 'ml-16 md:ml-64' : 'ml-16 md:ml-20'}`}>
 
 
                 {/* Top Header - Controls & Profile */}
