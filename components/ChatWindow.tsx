@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, ChatMessage, PartnerProfile } from '../types';
-import { GoogleGenAI } from '@google/genai';
 
 interface ChatWindowProps {
     currentUser: any;
@@ -121,28 +120,28 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
     }, [messages, isAiTyping, error]);
 
     const handleAiResponse = async (userMsg: string, currentHistory: ChatMessage[]) => {
-        if (!apiKey) {
+        const key = apiKey?.trim();
+        if (!key) {
             setError("Chave API do Gemini não configurada.");
             return;
         }
 
         setIsAiTyping(true);
         try {
-            const genAI = new GoogleGenAI(apiKey);
-            const model = genAI.getGenerativeModel({
-                model: "gemini-2.0-flash",
-                systemInstruction: `Você é a IA de ${activeTarget.display_name}. 
+            console.log("Chamando Gemini via REST API...");
+
+            const systemInstruction = `Você é a IA de ${activeTarget.display_name}. 
                 Personalidade: ${activeTarget.ai_settings?.personality || 'Amigável'}.
                 O usuário está falando com você via chat. 
                 Responda como se estivesse em um chat de texto (WhatsApp/Telegram). 
-                Seja natural, use emojis se combinar com a personalidade e seja breve.`
-            });
+                Seja natural, use emojis se combinar com a personalidade e seja breve.`;
 
             const chatHistory = currentHistory.slice(-10).map(m => ({
                 role: m.sender_id === currentUser.id ? 'user' : 'model',
                 parts: [{ text: m.content }]
             }));
 
+            // Filter and merge consecutive roles (Gemini requires turn-taking)
             const filteredHistory: any[] = [];
             chatHistory.forEach((msg, idx) => {
                 if (idx === 0 || msg.role !== filteredHistory[filteredHistory.length - 1].role) {
@@ -152,8 +151,27 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                 }
             });
 
-            const result = await model.generateContent({ contents: filteredHistory });
-            const aiResponseText = result.response.text();
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: { parts: { text: systemInstruction } },
+                        contents: filteredHistory
+                    })
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            const aiResponseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (!aiResponseText) throw new Error("IA retornou resposta vazia.");
 
             const { data: aiMsg, error: aiInsertError } = await supabase
                 .from('chat_messages')
@@ -207,7 +225,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
         if (sentMsg) {
             setMessages(prev => [...prev, sentMsg]);
             if (activeIsAi) {
-                console.log("Iniciando resposta da IA com API Key:", apiKey ? "Configurada" : "AUSENTE");
                 handleAiResponse(msgContent, [...messages, sentMsg]);
             }
         }
@@ -228,8 +245,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                             key={conv.profile.id}
                             onClick={() => { setActiveTarget(conv.profile); setActiveIsAi(conv.isAi); }}
                             className={`flex items-center gap-4 p-4 rounded-[1.5rem] cursor-pointer transition-all shrink-0 sm:shrink ${activeTarget.id === conv.profile.id
-                                    ? 'bg-blue-600 text-white'
-                                    : isDark ? 'hover:bg-white/5 text-white/60' : 'hover:bg-slate-50 text-slate-800'
+                                ? 'bg-blue-600 text-white'
+                                : isDark ? 'hover:bg-white/5 text-white/60' : 'hover:bg-slate-50 text-slate-800'
                                 }`}
                         >
                             <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md shrink-0">
@@ -255,7 +272,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                         {activeIsAi ? (
                             activeTarget.ai_settings?.image ? <img src={activeTarget.ai_settings.image} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-pink-500/10 flex items-center justify-center">⚡</div>
                         ) : (
-                            activeTarget.avatar_url ? <img src={activeTarget.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-blue-500/10 flex items-center justify-center">👤</div>
+                            activeTarget.avatar_url ? <img src={activeTarget.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-blue-500/10 flex items-center justify-center font-bold">👤</div>
                         )}
                     </div>
                     <div>
