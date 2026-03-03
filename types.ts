@@ -117,6 +117,8 @@ export interface PartnerProfile {
   relationshipStartedAt?: string | null;
   relationshipEndedAt?: string | null;
   gemini_api_key?: string;
+  chat_gemini_api_key?: string;
+  chat_model?: string;
   captionsEnabled?: boolean;
   captionLanguage?: PlatformLanguage;
   callerInfo?: {

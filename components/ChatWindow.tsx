@@ -9,6 +9,8 @@ interface ChatWindowProps {
     onClose: () => void;
     isDark: boolean;
     apiKey: string;
+    chatApiKey?: string;
+    chatModel?: string;
 }
 
 interface Conversation {
@@ -18,7 +20,7 @@ interface Conversation {
     lastMessageDate?: string;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfile: initialTarget, isAi: initialIsAi, onClose, isDark, apiKey }) => {
+export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfile: initialTarget, isAi: initialIsAi, onClose, isDark, apiKey, chatApiKey, chatModel }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [activeTarget, setActiveTarget] = useState<UserProfile>(initialTarget);
     const [activeIsAi, setActiveIsAi] = useState(initialIsAi);
@@ -120,15 +122,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
     }, [messages, isAiTyping, error]);
 
     const handleAiResponse = async (userMsg: string, currentHistory: ChatMessage[]) => {
-        const key = apiKey?.trim();
-        if (!key) {
+        const finalKey = (chatApiKey || apiKey || "").trim();
+        const finalModel = chatModel || 'gemini-2.0-flash';
+
+        if (!finalKey) {
             setError("Chave API do Gemini não configurada.");
             return;
         }
 
         setIsAiTyping(true);
         try {
-            console.log("Chamando Gemini via REST API...");
+            console.log(`Chamando Gemini (${finalModel}) via REST API...`);
 
             const systemInstruction = `Você é a IA de ${activeTarget.display_name}. 
                 Personalidade: ${activeTarget.ai_settings?.personality || 'Amigável'}.
@@ -152,7 +156,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
             });
 
             const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${finalModel}:generateContent?key=${finalKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

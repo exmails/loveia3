@@ -546,6 +546,51 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                                 </div>
                             </div>
 
+                            {/* Section: Chat AI Engine (Independent) */}
+                            <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-pink-600/5 blur-3xl rounded-full" />
+                                <div className="flex justify-between items-center mb-8">
+                                    <div>
+                                        <h3 className="text-sm font-bold uppercase tracking-widest text-pink-600">Chat AI Engine</h3>
+                                        <p className="text-[9px] font-bold opacity-30 uppercase mt-1 tracking-widest">Motor independente para mensagens de texto</p>
+                                    </div>
+                                    <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${profile.chat_gemini_api_key ? 'bg-emerald-500/10 text-emerald-500' : 'bg-white/5 opacity-50'}`}>
+                                        {profile.chat_gemini_api_key ? 'Configurado ✓' : 'Usando Global'}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">Modelo do Chat</label>
+                                            <select
+                                                value={profile.chat_model || 'gemini-2.0-flash'}
+                                                onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_model: e.target.value }))}
+                                                className={`w-full p-5 rounded-[2rem] text-sm font-bold border ${inputClasses} appearance-none cursor-pointer`}
+                                            >
+                                                <option value="gemini-2.0-flash">Gemini 2.0 Flash (Padrão)</option>
+                                                <option value="gemini-2.0-flash-lite-preview-02-05">Gemini 2.0 Flash-Lite</option>
+                                                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">API Key Específica (Opcional)</label>
+                                            <input
+                                                type="password"
+                                                value={profile.chat_gemini_api_key || ''}
+                                                onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_gemini_api_key: e.target.value }))}
+                                                className={`w-full p-5 rounded-[2rem] text-sm font-mono border ${inputClasses}`}
+                                                placeholder="Deixe vazio para usar a chave global"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-[9px] font-medium opacity-30 px-4 italic leading-relaxed text-center">
+                                        Isso permite que você use uma chave ou modelo diferente para o chat de texto, sem afetar a performance da chamada de voz.
+                                    </p>
+                                </div>
+                            </div>
+
                             {/* Section: Voice & Accent */}
                             <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
                                 <h3 className="text-sm font-bold uppercase tracking-widest mb-10 opacity-30">Voz & Sotaque Profissional</h3>
@@ -1000,6 +1045,8 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                     onClose={() => setActiveChat(null)}
                     isDark={isDark}
                     apiKey={apiKey}
+                    chatApiKey={profile.chat_gemini_api_key}
+                    chatModel={profile.chat_model}
                 />
             )}
 
