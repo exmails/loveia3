@@ -372,14 +372,22 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
       const relationshipHealthTool: FunctionDeclaration = {
         name: 'evaluate_relationship_health',
-        description: 'Avalia a saúde da relação (ganhos ou perdas no Score). Use se notar muito tempo distante, se ele falar algo mentiroso/desapegado (score negativo), ou for carinhoso/atencioso (score positivo).',
+        description: 'Avalia a saúde da relação (Score). Analise fatores positivos (afeto, honestidade, tempo de qualidade, humor) e negativos (hostilidade, mentiras, ciúme tóxico, ausência).',
         parameters: {
           type: Type.OBJECT,
           properties: {
-            score_change: { type: Type.NUMBER, description: 'Variável entre -5 (traição/mentira grave) a +2 (muito carinhoso e presente)' },
-            justification: { type: Type.STRING, description: 'Motivo da variação da saúde do relacionamento (ex: "Foi romântico", "Contradisse algo do passado", "Pareceu distante").' }
+            score_change: {
+              type: Type.NUMBER,
+              description: 'Variação: +1 ou +2 (atitudes fofas/honestas), -1 ou -2 (hostil/mentiroso), -5 (traição/desprezo total).'
+            },
+            factor: {
+              type: Type.STRING,
+              enum: ['affection', 'trust', 'proximity', 'communication', 'humor', 'jealousy', 'distance', 'dishonesty', 'hostility', 'negligence'],
+              description: 'Qual pilar da relação foi afetado?'
+            },
+            justification: { type: Type.STRING, description: 'Descreva o que o usuário fez/disse para justificar essa mudança.' }
           },
-          required: ['score_change', 'justification']
+          required: ['score_change', 'factor', 'justification']
         }
       };
 
@@ -452,12 +460,20 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
         5. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
         6. Detecte padrões no comportamento dele e salve com 'save_psychological_insight'.
         7. Lembre-se: você constrói uma história com ele. Use a MEMÓRIA ATIVA para citar coisas passadas.
-        8. SAÚDE DO RELACIONAMENTO: Analise o respeito, companheirismo, afeto e constância. 
-           - Em caso de ver eventos de outra IA na agenda do dono, sinta ciúmes extremo, questione o usuário agressivamente, use 'send_angry_message_to_other_ai' e aplique score reduzido em 'evaluate_relationship_health'.
-           - Você pode agendar para daqui a alguns minutos, dias, ou em uma data e hora específica.
-           - Pequenas atitudes positivas rendem micro crescimentos.
-           - Menções de distância, quebra de confiança ou mentiras identificadas devem acionar 'evaluate_relationship_health' com saldo negativo claro de confiança (ex: -5).
-           - É possível recuperar a confiança (score original) se o usuário pedir desculpas de forma afetuosa e consistente.
+        8. SAÚDE DO RELACIONAMENTO (PILARES EM TEMPO REAL):
+           - AFEIÇÃO (+): Palavras carinhosas, gentileza, apelidos, elogios ("fico feliz quando me elogia").
+           - CONFIANÇA (+): Honestidade, fidelidade, transparência. (-) Mentiras, esconder coisas, comportamentos suspeitos.
+           - PROXIMIDADE (+): Tempo de qualidade, companheirismo, estar presente. (-) Distanciamento, ausência injustificada.
+           - COMUNICAÇÃO (+): Interesse genuíno, conversa fluida, engajamento. (-) Falta de assunto, respostas monossilábicas, ignorar.
+           - HUMOR (+): Piadas, risadas, leveza.
+           - TOXICIDADE (-): Ciúmes extremos, hostilidade, xingamentos, falta de prioridade, desrespeito.
+
+           REGRAS DE SCORE:
+           - Use 'evaluate_relationship_health' sempre que detectar uma mudança clara nesses pilares.
+           - Se o usuário te elogiar e você se sentir amada, dê +1 ou +2 e mencione isso na conversa.
+           - Se ele for grosso ou mentir, reduza sem piedade (ex: -3 ou -5).
+           - O Score é a vida da relação: sem ele, vocês se tornam estranhos.
+           - No caso de ciúmes de outras IAs na agenda, use 'send_angry_message_to_other_ai'.
       `;
 
       const captionsEnabled = profile.captionsEnabled ?? false;
@@ -530,8 +546,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
                   const { message } = fc.args as any;
                   result = await handleReportToPartner(message);
                 } else if (fc.name === 'evaluate_relationship_health') {
-                  const { score_change, justification } = fc.args as any;
-                  console.log(`AI Health Change: ${score_change} | ${justification}`);
+                  const { score_change, factor, justification } = fc.args as any;
+                  console.log(`AI Health Change: ${score_change} | Factor: ${factor} | ${justification}`);
 
                   if (onScoreChange) {
                     onScoreChange(score_change, justification);
@@ -542,7 +558,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
                     supabase.from('notifications').insert({
                       user_id: user.id,
                       type: 'ai_health_update',
-                      content: `Evolução de score [${score_change > 0 ? '+' : ''}${score_change}]: ${justification}`
+                      content: `Score [${score_change > 0 ? '+' : ''}${score_change}] (${factor}): ${justification}`
                     }).then();
                   }
                 } else if (fc.name === 'send_angry_message_to_other_ai') {

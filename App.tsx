@@ -111,35 +111,30 @@ function App() {
     localStorage.setItem('GEMINI_API_KEY', apiKey);
   }, [apiKey]);
 
-  // 1. Relationship Decay Timer (Muito lenta para durar 1 a 3 meses)
-  // Decai apenas 0.0005% a cada 10s (aproximadamente 4.3% em 1 dia de app aberto direto)
+  // 1. Relationship Resilience & Decay System (30-day full lifecycle if unattended)
   useEffect(() => {
     const timer = setInterval(() => {
       setProfile(prev => {
-        const newScore = Math.max(0, prev.relationshipScore - 0.0005);
-
-        let startedAt = prev.relationshipStartedAt;
-        if (!startedAt) {
-          startedAt = new Date().toISOString();
-        }
-
-        let endedAt = prev.relationshipEndedAt;
-        if (newScore === 0 && prev.relationshipScore > 0) {
-          endedAt = new Date().toISOString();
-        } else if (newScore > 0 && endedAt) {
-          endedAt = null; // Reconciliation
-        }
-
-        return {
-          ...prev,
-          relationshipScore: newScore,
-          relationshipStartedAt: startedAt,
-          relationshipEndedAt: endedAt
-        };
+        const newScore = Math.max(0, prev.relationshipScore - 0.0003858);
+        return { ...prev, relationshipScore: newScore };
       });
     }, 10000);
     return () => clearInterval(timer);
   }, []);
+
+  // 2. Profile Sync (Debounced database saving)
+  useEffect(() => {
+    const syncProfile = async () => {
+      if (user && currentUserProfile) {
+        await supabase.from('profiles').update({
+          ai_settings: profile
+        }).eq('id', user.id);
+      }
+    };
+
+    const timeout = setTimeout(syncProfile, 5000); // Sync every 5s of inactivity
+    return () => clearTimeout(timeout);
+  }, [profile, user]);
 
   // Helper to check for today's refusal quota
   const isCallAllowedToday = () => {
@@ -625,10 +620,17 @@ function App() {
           profile={activePartner || profile}
           callReason={callReason}
           onEndCall={handleEndCall}
-          onScoreChange={(change) => {
+          onScoreChange={(change, reason) => {
             setProfile(prev => ({
               ...prev,
-              relationshipScore: Math.min(100, Math.max(0, prev.relationshipScore + change))
+              relationshipScore: Math.min(100, Math.max(0, prev.relationshipScore + change)),
+              history: [...prev.history, {
+                id: Date.now().toString(),
+                timestamp: Date.now(),
+                durationSec: 0,
+                moodEnd: prev.mood,
+                notes: `Variação de Humor: ${reason}`
+              }]
             }));
           }}
           apiKey={apiKey || ''}
