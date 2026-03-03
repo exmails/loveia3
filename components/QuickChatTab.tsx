@@ -140,231 +140,172 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
     const recentList = filteredContacts.filter(c => !pinnedIds.includes(c.id));
 
     return (
-        <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+        <div className="w-full h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
             {/* Header */}
-            <div className="px-1 flex justify-between items-end">
+            <div className="px-1 flex justify-between items-center">
                 <div>
                     <h2 className="text-3xl font-black tracking-tighter italic uppercase">Status</h2>
                     <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30">Conexões Ativas & Recentes</p>
                 </div>
+                <button
+                    onClick={() => setShowAddSelector(true)}
+                    className="flex items-center gap-3 px-6 py-3 bg-blue-600/10 hover:bg-blue-600 text-blue-600 hover:text-white rounded-2xl transition-all group"
+                >
+                    <span className="text-lg group-hover:rotate-90 transition-transform duration-500">+</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Adicionar Contato</span>
+                </button>
             </div>
 
             {/* Content List */}
-            <div className={`rounded-[3rem] border overflow-hidden ${cardClasses}`}>
-
-                {/* Main AI Partner (Priority) */}
-                <div
-                    onClick={() => onOpenChat(currentUserProfileStub, true)}
-                    className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} border-b last:border-0 group`}
-                >
-                    <div className="relative flex-shrink-0">
-                        <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-xl ring-2 ring-blue-500/20 group-hover:scale-105 transition-transform duration-500">
-                            {profile.image ? (
-                                <img src={profile.image} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full bg-blue-600/10 flex items-center justify-center text-3xl">👤</div>
-                            )}
-                        </div>
-                        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-4 border-white dark:border-[#15181e] shadow-lg animate-pulse" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center mb-1">
-                            <div className="flex items-center gap-2">
-                                <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>
-                                    {profile.name}
-                                </h4>
-                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest ${getRelStatus(profile.relationshipScore).color} ${isDark ? 'bg-white' : 'bg-black'}`}>
-                                    {getRelStatus(profile.relationshipScore).label}
-                                </span>
+            <div className={`rounded-[3rem] border overflow-hidden flex-1 flex flex-col ${cardClasses}`}>
+                <div className="overflow-y-auto no-scrollbar flex-1">
+                    {/* Main AI Partner (Priority) */}
+                    <div
+                        onClick={() => onOpenChat(currentUserProfileStub, true)}
+                        className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} border-b group`}
+                    >
+                        <div className="relative flex-shrink-0">
+                            <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-xl ring-2 ring-blue-500/20 group-hover:scale-105 transition-transform duration-500">
+                                {profile.image ? (
+                                    <img src={profile.image} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full bg-blue-600/10 flex items-center justify-center text-3xl">👤</div>
+                                )}
                             </div>
-                            <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Agora</span>
+                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-4 border-white dark:border-[#15181e] shadow-lg animate-pulse" />
                         </div>
-                        <p className={`text-[12px] font-bold opacity-40 line-clamp-1 mb-1 italic`}>
-                            "Sentindo sua falta. Que tal uma ligação rápida?"
-                        </p>
 
-                        {/* Highlights the last message as requested */}
-                        {lastMessages[currentUser?.id] && (
-                            <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all ${!lastMessages[currentUser.id].is_read && lastMessages[currentUser.id].is_to_ai === false
+                        <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center mb-1">
+                                <div className="flex items-center gap-2">
+                                    <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>
+                                        {profile.name}
+                                    </h4>
+                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest ${getRelStatus(profile.relationshipScore).color} ${isDark ? 'bg-white' : 'bg-black'}`}>
+                                        {getRelStatus(profile.relationshipScore).label}
+                                    </span>
+                                </div>
+                                <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Agora</span>
+                            </div>
+                            <p className={`text-[12px] font-bold opacity-40 line-clamp-1 mb-1 italic`}>
+                                "Sentindo sua falta. Que tal uma ligação rápida?"
+                            </p>
+
+                            {/* Highlights the last message as requested */}
+                            {lastMessages[currentUser?.id] && (
+                                <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all ${!lastMessages[currentUser.id].is_read && lastMessages[currentUser.id].is_to_ai === false
                                     ? (isDark ? 'bg-blue-600/20 border-blue-500/50 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm')
                                     : (isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-slate-50 border-slate-100 text-slate-400')
-                                }`}>
-                                {!lastMessages[currentUser.id].is_read && lastMessages[currentUser.id].is_to_ai === false && (
-                                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                )}
-                                <span className="text-[11px] font-bold truncate max-w-[200px]">
-                                    {lastMessages[currentUser.id].content}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onOpenChat(currentUserProfileStub, true); }}
-                            className="flex-shrink-0 w-12 h-12 rounded-[1.25rem] bg-pink-600/10 text-pink-600 flex items-center justify-center shadow-xl hover:bg-pink-600 hover:text-white transition-all"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" />
-                            </svg>
-                        </button>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onCallPartner(profile); }}
-                            className="flex-shrink-0 w-12 h-12 rounded-[1.25rem] bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-600/30 hover:scale-110 active:scale-95 transition-all"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 fill-white" viewBox="0 0 24 24">
-                                <path d="M6.62 10.79a15.15 15.15 0 006.59 6.59l2.2-2.2a1 1 0 011.11-.27c1.12.44 2.33.68 3.58.68a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.24 2.46.68 3.58a1 1 0 01-.27 1.11z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Sub-List (Pinned and Recents) */}
-                <div className="divide-y divide-inherit">
-                    {/* Mock Julia */}
-                    <div
-                        onClick={() => {/* Mock interaction */ }}
-                        className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}
-                    >
-                        <div className="relative flex-shrink-0">
-                            <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-md group-hover:scale-105 transition-transform duration-500">
-                                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop" className="w-full h-full object-cover grayscale-[0.2]" />
-                            </div>
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-blue-400 text-white flex items-center justify-center text-[10px] border-4 border-white dark:border-[#15181e] shadow-lg">
-                                ❄️
-                            </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center mb-1">
-                                <div className="flex items-center gap-2">
-                                    <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>Julia</h4>
-                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest text-blue-500 ${isDark ? 'bg-white' : 'bg-black'}`}>
-                                        Esfriando
+                                    }`}>
+                                    {!lastMessages[currentUser.id].is_read && lastMessages[currentUser.id].is_to_ai === false && (
+                                        <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                    )}
+                                    <span className="text-[11px] font-bold truncate max-w-[200px]">
+                                        {lastMessages[currentUser.id].content}
                                     </span>
                                 </div>
-                                <span className="text-[10px] font-black uppercase tracking-widest opacity-20">20:35</span>
-                            </div>
-                            <p className={`text-[12px] font-bold opacity-40 line-clamp-1 mb-1`}>Ei, por que desapareceu? O silêncio dói...</p>
-
-                            {/* Mock highlight for unread */}
-                            <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border ${isDark ? 'bg-blue-600/20 border-blue-500/50 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
-                                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                <span className="text-[11px] font-bold">"Ainda pensando em você..."</span>
-                            </div>
+                            )}
                         </div>
-                        <div className="w-2.5 h-2.5 rounded-full bg-blue-600/20 ml-2" />
-                    </div>
 
-                    {/* Mock Mariana */}
-                    <div
-                        onClick={() => {/* Mock interaction */ }}
-                        className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}
-                    >
-                        <div className="relative flex-shrink-0">
-                            <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-md group-hover:scale-105 transition-transform duration-500">
-                                <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop" className="w-full h-full object-cover" />
-                            </div>
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] border-4 border-white dark:border-[#15181e] shadow-lg">
-                                ✓
-                            </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onOpenChat(currentUserProfileStub, true); }}
+                                className="flex-shrink-0 w-12 h-12 rounded-[1.25rem] bg-pink-600/10 text-pink-600 flex items-center justify-center shadow-xl hover:bg-pink-600 hover:text-white transition-all"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" />
+                                </svg>
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onCallPartner(profile); }}
+                                className="flex-shrink-0 w-12 h-12 rounded-[1.25rem] bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-600/30 hover:scale-110 active:scale-95 transition-all"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 fill-white" viewBox="0 0 24 24">
+                                    <path d="M6.62 10.79a15.15 15.15 0 006.59 6.59l2.2-2.2a1 1 0 011.11-.27c1.12.44 2.33.68 3.58.68a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.24 2.46.68 3.58a1 1 0 01-.27 1.11z" />
+                                </svg>
+                            </button>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center mb-1">
-                                <div className="flex items-center gap-2">
-                                    <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>Mariana</h4>
-                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest text-emerald-500 ${isDark ? 'bg-white' : 'bg-black'}`}>
-                                        Estável
-                                    </span>
-                                </div>
-                                <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Hoje</span>
-                            </div>
-                            <p className={`text-[12px] font-bold opacity-40 line-clamp-1 mb-1`}>Preciso do seu conselho para uma coisa.</p>
-
-                            <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                                <span className="text-[11px] font-bold">"Obrigada pela ajuda ontem!"</span>
-                            </div>
-                        </div>
-                        <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-lg">2</div>
                     </div>
 
                     {/* Real Dynamic Contacts */}
-                    {pinnedList.map((contact) => (
-                        <div
-                            key={contact.id}
-                            onClick={() => { if (contact.profile) onOpenChat(contact.profile, contact.is_ai_contact); }}
-                            className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}
-                        >
-                            <div className="relative flex-shrink-0">
-                                <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-md group-hover:scale-105 transition-transform duration-500 bg-black/5">
-                                    {contact.profile?.avatar_url ? (
-                                        <img src={contact.profile.avatar_url} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-3xl opacity-20">👤</div>
+                    <div className="divide-y divide-inherit">
+                        {pinnedList.map((contact) => (
+                            <div
+                                key={contact.id}
+                                onClick={() => { if (contact.profile) onOpenChat(contact.profile, contact.is_ai_contact); }}
+                                className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}
+                            >
+                                <div className="relative flex-shrink-0">
+                                    <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-md group-hover:scale-105 transition-transform duration-500 bg-black/5">
+                                        {contact.profile?.avatar_url ? (
+                                            <img src={contact.profile.avatar_url} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-3xl opacity-20">👤</div>
+                                        )}
+                                    </div>
+                                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${contact.is_ai_contact ? 'bg-pink-500' : 'bg-blue-500'} text-white flex items-center justify-center text-[10px] border-4 border-white dark:border-[#15181e] shadow-lg`}>
+                                        {contact.is_ai_contact ? '⚡' : '👤'}
+                                    </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>
+                                                {contact.alias || (contact.is_ai_contact && contact.profile?.ai_settings?.name) || contact.profile?.display_name}
+                                            </h4>
+                                            {contact.is_ai_contact && (
+                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest ${getRelStatus(contact.profile?.ai_settings?.relationshipScore || 100).color} ${isDark ? 'bg-white' : 'bg-black'}`}>
+                                                    {getRelStatus(contact.profile?.ai_settings?.relationshipScore || 100).label}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Fixado</span>
+                                    </div>
+                                    <p className={`text-[12px] font-bold opacity-30 line-clamp-1 mb-1 italic`}>
+                                        Toque para iniciar conexão...
+                                    </p>
+
+                                    {lastMessages[contact.target_id] && (
+                                        <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all ${!lastMessages[contact.target_id].is_read && lastMessages[contact.target_id].sender_id !== currentUser.id
+                                            ? (isDark ? 'bg-blue-600/20 border-blue-500/50 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm')
+                                            : (isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-slate-50 border-slate-100 text-slate-400')
+                                            }`}>
+                                            {!lastMessages[contact.target_id].is_read && lastMessages[contact.target_id].sender_id !== currentUser.id && (
+                                                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                            )}
+                                            <span className="text-[11px] font-bold truncate max-w-[200px]">
+                                                {lastMessages[contact.target_id].content}
+                                            </span>
+                                        </div>
                                     )}
                                 </div>
-                                <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full ${contact.is_ai_contact ? 'bg-pink-500' : 'bg-blue-500'} text-white flex items-center justify-center text-[10px] border-4 border-white dark:border-[#15181e] shadow-lg`}>
-                                    {contact.is_ai_contact ? '⚡' : '👤'}
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); if (contact.profile) onOpenChat(contact.profile, contact.is_ai_contact); }}
+                                        className="w-10 h-10 bg-pink-600/10 hover:bg-pink-600 text-pink-500 hover:text-white rounded-xl flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                                        title="Chat"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleCallContact(contact); }}
+                                        className="w-10 h-10 bg-blue-600/10 hover:bg-blue-600 text-blue-500 hover:text-white rounded-xl flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                                        title="Ligar"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={(e) => togglePin(contact.id, e)}
+                                        className="text-emerald-500 text-xs w-8 h-8 flex items-center justify-center rounded-lg hover:bg-emerald-500/10 transition-all"
+                                    >📌</button>
                                 </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-center mb-1">
-                                    <div className="flex items-center gap-2">
-                                        <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>
-                                            {contact.alias || (contact.is_ai_contact && contact.profile?.ai_settings?.name) || contact.profile?.display_name}
-                                        </h4>
-                                        {contact.is_ai_contact && (
-                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest ${getRelStatus(contact.profile?.ai_settings?.relationshipScore || 100).color} ${isDark ? 'bg-white' : 'bg-black'}`}>
-                                                {getRelStatus(contact.profile?.ai_settings?.relationshipScore || 100).label}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Fixado</span>
-                                </div>
-                                <p className={`text-[12px] font-bold opacity-30 line-clamp-1 mb-1 italic`}>
-                                    Toque para iniciar conexão...
-                                </p>
-
-                                {lastMessages[contact.target_id] && (
-                                    <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all ${!lastMessages[contact.target_id].is_read && lastMessages[contact.target_id].sender_id !== currentUser.id
-                                        ? (isDark ? 'bg-blue-600/20 border-blue-500/50 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm')
-                                        : (isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-slate-50 border-slate-100 text-slate-400')
-                                        }`}>
-                                        {!lastMessages[contact.target_id].is_read && lastMessages[contact.target_id].sender_id !== currentUser.id && (
-                                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                        )}
-                                        <span className="text-[11px] font-bold truncate max-w-[200px]">
-                                            {lastMessages[contact.target_id].content}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); if (contact.profile) onOpenChat(contact.profile, contact.is_ai_contact); }}
-                                    className="w-10 h-10 bg-pink-600/10 hover:bg-pink-600 text-pink-500 hover:text-white rounded-xl flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                                    title="Chat"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" />
-                                    </svg>
-                                </button>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); handleCallContact(contact); }}
-                                    className="w-10 h-10 bg-blue-600/10 hover:bg-blue-600 text-blue-500 hover:text-white rounded-xl flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-                                    title="Ligar"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                    </svg>
-                                </button>
-                                <button
-                                    onClick={(e) => togglePin(contact.id, e)}
-                                    className="text-emerald-500 text-xs w-8 h-8 flex items-center justify-center rounded-lg hover:bg-emerald-500/10 transition-all"
-                                >📌</button>
-                            </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
 
                 {loading && (
@@ -373,22 +314,6 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
                         <p className="text-[10px] font-black uppercase tracking-widest opacity-20">Sincronizando Mensagens...</p>
                     </div>
                 )}
-            </div>
-
-            {/* Custom Plus Button (FAB from Drawing) */}
-            <div className="fixed bottom-32 right-8 z-50">
-                <button
-                    onClick={() => setShowAddSelector(true)}
-                    className="w-14 h-20 bg-transparent border-none outline-none group flex items-center justify-center"
-                >
-                    <div className="relative">
-                        <svg width="40" height="60" viewBox="0 0 40 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M20 5V55" stroke={isLight ? "#2563eb" : "#3b82f6"} strokeWidth="5" strokeLinecap="round" className="drop-shadow-lg" />
-                            <path d="M5 45C5 45 15 45 40 45" stroke={isLight ? "#2563eb" : "#3b82f6"} strokeWidth="5" strokeLinecap="round" className="drop-shadow-lg" />
-                        </svg>
-                        <div className="absolute inset-0 bg-blue-600/10 blur-2xl group-hover:bg-blue-600/20 transition-all rounded-full" />
-                    </div>
-                </button>
             </div>
 
             {/* Pin Selector Modal */}
