@@ -257,7 +257,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
     };
 
     return (
-        <div className={`min-h-screen ${themeClasses} transition-colors duration-700 flex font-sans tracking-tight overflow-x-hidden`}>
+        <div className={`min-h-screen ${themeClasses} transition-colors duration-700 font-sans tracking-tight overflow-x-hidden`}>
 
             {/* Sidebar - Vertical Navigation (Permanent) */}
             <aside
@@ -338,12 +338,12 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
             )}
 
             {/* Main Content Area */}
-            <div className={`flex-1 flex flex-col transition-all duration-500 ${isSidebarExpanded ? 'ml-16 md:ml-64' : 'ml-16 md:ml-20'}`}>
+            <div className={`flex flex-col min-h-screen transition-all duration-500 ml-16 md:ml-20 w-[calc(100%-4rem)] md:w-[calc(100%-5rem)]`}>
 
 
                 {/* Top Header - Controls & Profile */}
-                <header className={`w-full sticky top-0 z-[60] px-4 md:px-8 py-4 md:py-6 flex justify-end items-center ${isLight ? 'bg-[#f9f9fb]/80' : 'bg-[#0b0c10]/40'} backdrop-blur-xl transition-all`}>
-                    <div className="flex items-center gap-5">
+                <header className={`w-full sticky top-0 z-[60] px-3 md:px-8 py-3 md:py-6 flex justify-end items-center ${isLight ? 'bg-[#f9f9fb]/80' : 'bg-[#0b0c10]/40'} backdrop-blur-xl transition-all`}>
+                    <div className="flex items-center gap-2 md:gap-5">
                         {user && (
                             <button
                                 onClick={() => setShowNotifications(true)}
@@ -359,8 +359,8 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                         )}
 
                         {user ? (
-                            <div className="flex items-center gap-4 px-4 py-2 rounded-[2rem] hover:bg-black/5 dark:hover:bg-white/5 transition-all cursor-pointer group" onClick={() => setShowProfileModal(true)}>
-                                <div className="flex flex-col items-end">
+                            <div className="flex items-center gap-2 md:gap-4 px-2 md:px-4 py-2 rounded-[2rem] hover:bg-black/5 dark:hover:bg-white/5 transition-all cursor-pointer group" onClick={() => setShowProfileModal(true)}>
+                                <div className="hidden md:flex flex-col items-end">
                                     <span className="text-[11px] font-black uppercase tracking-widest truncate max-w-[120px]">{currentUserProfile?.display_name || "Usuário"}</span>
                                     <span className="text-[9px] opacity-40 font-black tracking-tighter text-blue-600">{formatDisplayNumber(currentUserProfile?.personal_number || "", false)}</span>
                                 </div>
@@ -388,12 +388,12 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                 </header>
 
                 {/* Dashboard Scroll Area */}
-                <div className="flex-1 overflow-y-auto no-scrollbar pt-4 px-8 pb-24 flex flex-col items-center">
+                <div className="flex-1 overflow-y-auto no-scrollbar pt-4 px-3 md:px-8 pb-24 flex flex-col items-center">
                     <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-8 duration-700">
                         {activeTab === 'dashboard' && (
                             <div className="flex flex-col gap-8">
                                 {/* Nicknames and Identity Section */}
-                                <div className={`w-full p-8 rounded-[3rem] border relative overflow-hidden ${cardClasses}`}>
+                                <div className={`w-full p-4 md:p-8 rounded-[2rem] md:rounded-[3rem] border relative overflow-hidden ${cardClasses}`}>
                                     <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 blur-[100px] rounded-full" />
                                     <div className="relative z-10">
                                         <div className="flex items-center gap-3 mb-6">
@@ -471,9 +471,9 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                                     {/* Pro Card: Relationship Status */}
-                                    <div className={`p-8 rounded-[3rem] border relative overflow-hidden flex flex-col justify-between min-h-[300px] ${cardClasses}`}>
+                                    <div className={`p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border relative overflow-hidden flex flex-col justify-between min-h-[240px] md:min-h-[300px] ${cardClasses}`}>
                                         <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-[80px] rounded-full" />
 
                                         <div>
@@ -502,7 +502,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                                     {/* Call Control Center */}
                                     <div className="flex flex-col gap-6">
                                         {/* Identification Profiles */}
-                                        <div className={`p-6 rounded-[3rem] border flex items-center justify-between ${cardClasses}`}>
+                                        <div className={`p-4 md:p-6 rounded-[2rem] md:rounded-[3rem] border flex items-center justify-between ${cardClasses}`}>
                                             <div className="flex items-center gap-3 w-[40%]">
                                                 <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800">
                                                     {currentUserProfile?.avatar_url ? (
@@ -538,7 +538,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                                             </div>
                                         </div>
 
-                                        <div className={`p-8 rounded-[3rem] border flex flex-col gap-6 ${cardClasses} transform hover:scale-[1.02] transition-all cursor-pointer shadow-2xl shadow-blue-500/5`} onClick={onStartCall}>
+                                        <div className={`p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border flex flex-col gap-6 ${cardClasses} transform hover:scale-[1.02] transition-all cursor-pointer shadow-2xl shadow-blue-500/5`} onClick={onStartCall}>
                                             <div className="flex justify-between items-center">
                                                 <div className="flex items-center gap-4">
                                                     <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl shadow-xl shadow-blue-500/40 animate-pulse">
@@ -553,7 +553,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                                             </div>
                                         </div>
 
-                                        <div className={`p-8 rounded-[2.5rem] border ${cardClasses} flex-1`}>
+                                        <div className={`p-4 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border ${cardClasses} flex-1`}>
                                             <div className="flex justify-between items-start mb-6">
                                                 <p className="text-[11px] font-bold uppercase tracking-widest opacity-30">Status do Sistema</p>
                                                 <div className="flex gap-2">
@@ -1038,7 +1038,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                         )}
 
                         {activeTab === 'chats' && (
-                            <div className="w-full h-[calc(100vh-280px)]"><QuickChatTab currentUser={user} profile={profile} onCallPartner={onStartCall} onOpenChat={(target, isAi) => setActiveChat({ profile: target, isAi })} isDark={isDark} /></div>
+                            <div className="w-full h-[calc(100vh-200px)] md:h-[calc(100vh-280px)]"><QuickChatTab currentUser={user} profile={profile} onCallPartner={onStartCall} onOpenChat={(target, isAi) => setActiveChat({ profile: target, isAi })} isDark={isDark} /></div>
                         )}
                     </div>
                 </div>

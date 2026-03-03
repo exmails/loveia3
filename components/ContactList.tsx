@@ -348,7 +348,7 @@ export const ContactList: React.FC<ContactListProps> = ({ currentUser, onCallPar
 
             {/* My ID Card */}
             {myProfile && (
-                <div className={`p-8 rounded-[3rem] border relative overflow-hidden ${cardClasses}`}>
+                <div className={`p-5 md:p-8 rounded-[2rem] md:rounded-[3rem] border relative overflow-hidden ${cardClasses}`}>
                     <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl rounded-full" />
                     <div className="flex justify-between items-start mb-6">
                         <div className="flex items-center gap-3">
@@ -517,8 +517,8 @@ export const ContactList: React.FC<ContactListProps> = ({ currentUser, onCallPar
                 )}
 
                 {/* Contacts List */}
-                <div className={`rounded-[3rem] border overflow-hidden ${cardClasses}`}>
-                    <div className="p-8 border-b border-inherit bg-black/5 dark:bg-white/5 flex items-center justify-between">
+                <div className={`rounded-[2rem] md:rounded-[3rem] border overflow-hidden ${cardClasses}`}>
+                    <div className="p-5 md:p-8 border-b border-inherit bg-black/5 dark:bg-white/5 flex items-center justify-between">
                         <h3 className="text-xs font-black uppercase tracking-widest opacity-30 italic">Agenda de Conexões</h3>
                         {searchQuery && (
                             <span className="text-[9px] font-black uppercase opacity-20 bg-black/5 dark:bg-white/5 px-3 py-1 rounded-full">Filtrado</span>

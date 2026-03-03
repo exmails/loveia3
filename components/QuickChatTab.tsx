@@ -142,22 +142,22 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
     return (
         <div className="w-full h-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
             {/* Header */}
-            <div className="px-1 flex justify-between items-center">
+            <div className="px-1 flex justify-between items-center gap-2">
                 <div>
-                    <h2 className="text-3xl font-black tracking-tighter italic uppercase">Status</h2>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30">Conexões Ativas & Recentes</p>
+                    <h2 className="text-2xl md:text-3xl font-black tracking-tighter italic uppercase">Status</h2>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30">Conexões Ativas &amp; Recentes</p>
                 </div>
                 <button
                     onClick={() => setShowAddSelector(true)}
-                    className="flex items-center gap-3 px-6 py-3 bg-blue-600/10 hover:bg-blue-600 text-blue-600 hover:text-white rounded-2xl transition-all group"
+                    className="flex-shrink-0 flex items-center gap-2 md:gap-3 px-3 md:px-6 py-3 bg-blue-600/10 hover:bg-blue-600 text-blue-600 hover:text-white rounded-2xl transition-all group"
                 >
                     <span className="text-lg group-hover:rotate-90 transition-transform duration-500">+</span>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Adicionar Contato</span>
+                    <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest">Adicionar Contato</span>
                 </button>
             </div>
 
             {/* Content List */}
-            <div className={`rounded-[3rem] border overflow-hidden flex-1 flex flex-col ${cardClasses}`}>
+            <div className={`rounded-[2rem] md:rounded-[3rem] border overflow-hidden flex-1 flex flex-col ${cardClasses}`}>
                 <div className="overflow-y-auto no-scrollbar flex-1">
                     {/* Main AI Partner (Priority) */}
                     <div

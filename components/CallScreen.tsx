@@ -815,9 +815,126 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
     }, 500);
   };
 
+  // ─── POST-SESSION PHRASE ANALYSIS ───────────────────────────────────────────
+  const analyzeSessionAndUpdatePhrases = async (conversationId: string) => {
+    if (!user || !apiKey) return;
+    try {
+      // 1. Fetch the full session transcript
+      const { data: messages } = await supabase
+        .from('messages')
+        .select('sender, content')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (!messages || messages.length < 2) return; // Not enough content to analyze
+
+      const transcript = messages
+        .map(m => `${m.sender === 'user' ? 'USUÁRIO' : 'IA'}: ${m.content}`)
+        .join('\n');
+
+      // 2. Fetch existing phrases for this user
+      const { data: existingPhrases } = await supabase
+        .from('ai_psychological_strategies')
+        .select('id, recognition_phrase, category, score')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('score', { ascending: false })
+        .limit(30);
+
+      const phrasesJson = existingPhrases
+        ? existingPhrases.map(p => ({ id: p.id, phrase: p.recognition_phrase, category: p.category, score: p.score }))
+        : [];
+
+      // 3. Ask Gemini to analyze and return JSON update instructions
+      const prompt = `Você é um psicólogo especialista em análise comportamental. Analise a transcrição de uma conversa de voz abaixo e faça duas coisas:
+
+1. Para cada FRASE EXISTENTE abaixo, avalie se a transcrição CONFIRMOU (+1), CONTRADISSE (-1), ou foi IRRELEVANTE (0) para aquela frase.
+2. Identifique até 3 NOVAS frases de reconhecimento de personalidade que ficaram claras nesta sessão, que ainda NÃO estão na lista existente.
+
+FRASES EXISTENTES:
+${JSON.stringify(phrasesJson, null, 2)}
+
+TRANSCRIÇÃO DA SESSÃO:
+${transcript.substring(0, 6000)}
+
+Responda APENAS com um JSON válido no seguinte formato (sem markdown, sem explicação extra):
+{
+  "score_updates": [
+    { "id": "<uuid da frase existente>", "delta": <+1, -1 ou 0>, "reason": "<motivo breve em pt-BR>" }
+  ],
+  "new_phrases": [
+    { "recognition_phrase": "<frase descritiva na 2ª pessoa>", "category": "<categoria>" }
+  ]
+}
+
+Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, personalidade, comunicacao
+Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 1500, temperature: 0.3, responseMimeType: 'application/json' }
+          })
+        }
+      );
+
+      const json = await res.json();
+      const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!rawText) return;
+
+      // Parse JSON (strip markdown fences if present)
+      const cleanJson = rawText.replace(/^```json\n?|^```\n?|```$/gm, '').trim();
+      const analysis = JSON.parse(cleanJson);
+
+      // 4. Apply score updates (delta != 0 only)
+      const scoreUpdates = (analysis.score_updates || []).filter((u: any) => u.delta !== 0);
+      for (const update of scoreUpdates) {
+        if (!update.id) continue;
+        // Fetch current score first
+        const { data: current } = await supabase
+          .from('ai_psychological_strategies')
+          .select('score')
+          .eq('id', update.id)
+          .single();
+        if (current) {
+          const newScore = Math.max(-10, Math.min(20, (current.score || 1) + update.delta));
+          await supabase
+            .from('ai_psychological_strategies')
+            .update({ score: newScore, last_used_at: new Date().toISOString() })
+            .eq('id', update.id);
+        }
+      }
+
+      // 5. Insert new phrases
+      const newPhrases = (analysis.new_phrases || []).slice(0, 3);
+      for (const phrase of newPhrases) {
+        if (!phrase.recognition_phrase) continue;
+        await supabase.from('ai_psychological_strategies').insert({
+          user_id: user.id,
+          recognition_phrase: phrase.recognition_phrase,
+          category: phrase.category || 'personalidade',
+          score: 1,
+          status: 'active',
+          source_conversation_id: conversationId,
+          last_used_at: new Date().toISOString()
+        });
+      }
+
+      console.log(`[PhraseAnalysis] Sessão analisada: ${scoreUpdates.length} frases atualizadas, ${newPhrases.length} novas frases criadas.`);
+    } catch (err) {
+      console.warn('[PhraseAnalysis] Erro na análise pós-sessão:', err);
+    }
+  };
+
   const stopCall = () => {
-    if (conversationIdRef.current) {
+    // Trigger post-session phrase analysis asynchronously (does not block UI)
+    if (conversationIdRef.current && user) {
       supabase.from('conversations').update({ ended_at: new Date().toISOString() }).eq('id', conversationIdRef.current).then();
+      analyzeSessionAndUpdatePhrases(conversationIdRef.current);
     }
     if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach(t => t.stop());
