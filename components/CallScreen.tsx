@@ -269,8 +269,15 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           memoryContext += `\nASSUNTOS EM PAUTA: ${topics.map(t => `${t.title} (Interesse: ${t.interest_level})`).join(', ')}`;
         }
         if (psych) {
-          memoryContext += `\nPERFIL DO USUÁRIO: ${JSON.stringify(psych.personality_traits)}`;
+          memoryContext += `\nPERFIL PSICOLÓGICO (Traços): ${JSON.stringify(psych.personality_traits)}`;
         }
+
+        // Fetch Recognition Phrases (New Perfil Tab)
+        const { data: recPhrases } = await supabase.from('ai_psychological_strategies').select('recognition_phrase, score').eq('user_id', user.id).eq('status', 'active').order('score', { ascending: false }).limit(10);
+        if (recPhrases && recPhrases.length > 0) {
+          memoryContext += `\nFRASES DE RECONHECIMENTO DE PERSONALIDADE: ${recPhrases.map(p => `"${p.recognition_phrase}" (Força: ${p.score})`).join(', ')}`;
+        }
+
         if (ai_profile) {
           memoryContext += `\nSUA EVOLUÇÃO: Intimidade ${ai_profile.intimacy_level}%, Humor ${ai_profile.humor_usage}%`;
         }
@@ -552,7 +559,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   isUserTalkingRef.current = false;
                   lastSilencePromptRef.current = Date.now();
                   sessionPromise.then(session => {
-                    session.sendRealtimeInput([{ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio por um tempo. Tome a iniciativa agora, puxe um assunto novo ou pergunte algo interessado sobre o que você está vendo ou sobre a vida dele." }]);
+                    (session as any).sendRealtimeInput([{ parts: [{ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio por um tempo. Tome a iniciativa agora, puxe um assunto novo ou pergunte algo interessado sobre o que você está vendo ou sobre a vida dele." }] }]);
                   });
                 }
               }
@@ -566,8 +573,8 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             // Initial engagement trigger
             setTimeout(() => {
               sessionPromise.then(session => {
-                session.sendRealtimeInput([{
-                  text: "Oi! Acabei de conectar. Observe o que estou fazendo pela câmera e comece a conversa você mesma, puxando assunto sobre algo que viu ou me perguntando como foi meu dia. Não espere eu falar nada."
+                (session as any).sendRealtimeInput([{
+                  parts: [{ text: "Oi! Acabei de conectar. Observe o que estou fazendo pela câmera e comece a conversa você mesma, puxando assunto sobre algo que viu ou me perguntando como foi meu dia. Não espere eu falar nada." }]
                 }]);
               });
             }, 1500);
@@ -819,6 +826,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
   const analyzeSessionAndUpdatePhrases = async (conversationId: string) => {
     if (!user || !apiKey) return;
     try {
+      // Small delay to ensure all messages from the live session are committed to Supabase
+      await new Promise(resolve => setTimeout(resolve, 4000));
+
       // 1. Fetch the full session transcript
       const { data: messages } = await supabase
         .from('messages')
@@ -849,26 +859,28 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
       const prompt = `Você é um psicólogo especialista em análise comportamental. Analise a transcrição de uma conversa de voz abaixo e faça duas coisas:
 
 1. Para cada FRASE EXISTENTE abaixo, avalie se a transcrição CONFIRMOU (+1), CONTRADISSE (-1), ou foi IRRELEVANTE (0) para aquela frase.
-2. Identifique até 3 NOVAS frases de reconhecimento de personalidade que ficaram claras nesta sessão, que ainda NÃO estão na lista existente.
+2. Identifique NOVAS frases de reconhecimento de personalidade (na segunda pessoa, como se estivesse descrevendo o usuário) que ficaram claras nesta sessão e que ainda NÃO estão na lista existente. FOQUE EM COMPORTAMENTOS, EMOÇÕES, PREFERÊNCIAS E TRAÇOS ÚNICOS.
 
 FRASES EXISTENTES:
 ${JSON.stringify(phrasesJson, null, 2)}
 
 TRANSCRIÇÃO DA SESSÃO:
-${transcript.substring(0, 6000)}
+${transcript.substring(0, 10000)}
 
 Responda APENAS com um JSON válido no seguinte formato (sem markdown, sem explicação extra):
 {
   "score_updates": [
-    { "id": "<uuid da frase existente>", "delta": <+1, -1 ou 0>, "reason": "<motivo breve em pt-BR>" }
+    { "id": "<id da frase existente>", "delta": <+1, -1 ou 0>, "reason": "<motivo breve em pt-BR>" }
   ],
   "new_phrases": [
-    { "recognition_phrase": "<frase descritiva na 2ª pessoa>", "category": "<categoria>" }
+    { "recognition_phrase": "<frase descritiva na 2ª pessoa: ex: 'Você costuma rir quando...' ou 'Você parece valorizar muito...'>", "category": "<categoria>" }
   ]
 }
 
 Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, personalidade, comunicacao
-Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
+Se não houver novidades, retorne arrays vazios. Limite de 5 novas frases no máximo.`;
+
+      console.log(`[PhraseAnalysis] Iniciando análise para sessão ${conversationId}...`);
 
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -894,10 +906,9 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
       const scoreUpdates = (analysis.score_updates || []).filter((u: any) => u.delta !== 0);
       for (const update of scoreUpdates) {
         if (!update.id) continue;
-        // Fetch current score first
         const { data: current } = await supabase
           .from('ai_psychological_strategies')
-          .select('score')
+          .select('score, recognition_phrase')
           .eq('id', update.id)
           .single();
         if (current) {
@@ -906,14 +917,15 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
             .from('ai_psychological_strategies')
             .update({ score: newScore, last_used_at: new Date().toISOString() })
             .eq('id', update.id);
+          console.log(`[PhraseAnalysis] Atualizado: "${current.recognition_phrase}" (Delta: ${update.delta}, Novo Score: ${newScore})`);
         }
       }
 
       // 5. Insert new phrases
-      const newPhrases = (analysis.new_phrases || []).slice(0, 3);
+      const newPhrases = (analysis.new_phrases || []).slice(0, 5);
       for (const phrase of newPhrases) {
         if (!phrase.recognition_phrase) continue;
-        await supabase.from('ai_psychological_strategies').insert({
+        const { error } = await supabase.from('ai_psychological_strategies').insert({
           user_id: user.id,
           recognition_phrase: phrase.recognition_phrase,
           category: phrase.category || 'personalidade',
@@ -922,9 +934,12 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
           source_conversation_id: conversationId,
           last_used_at: new Date().toISOString()
         });
+        if (!error) {
+          console.log(`[PhraseAnalysis] Nova frase: "${phrase.recognition_phrase}" (${phrase.category})`);
+        }
       }
 
-      console.log(`[PhraseAnalysis] Sessão analisada: ${scoreUpdates.length} frases atualizadas, ${newPhrases.length} novas frases criadas.`);
+      console.log(`[PhraseAnalysis] Sucesso: ${scoreUpdates.length} updates, ${newPhrases.length} novas.`);
     } catch (err) {
       console.warn('[PhraseAnalysis] Erro na análise pós-sessão:', err);
     }
