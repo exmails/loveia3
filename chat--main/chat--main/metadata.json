@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Chat Pro",
+  "description": "A professional chat interface with model selection and custom API key support for Gemini models.",
+  "requestFramePermissions": []
+}

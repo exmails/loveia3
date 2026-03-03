@@ -568,21 +568,22 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                                                 onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_model: e.target.value }))}
                                                 className={`w-full p-5 rounded-[2rem] text-sm font-bold border ${inputClasses} appearance-none cursor-pointer`}
                                             >
-                                                <option value="gemini-2.0-flash">Gemini 2.0 Flash (Padrão)</option>
-                                                <option value="gemini-2.0-flash-lite-preview-02-05">Gemini 2.0 Flash-Lite</option>
-                                                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (RECOMENDADO)</option>
-                                                <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro</option>
-                                                <option value="gemini-1.0-pro">Gemini 1.0 Pro (Antigo)</option>
+                                                <option value="gemini-2.0-flash">Gemini 3 Flash (Fast & Efficient)</option>
+                                                <option value="gemini-2.0-pro-exp-02-05">Gemini 3.1 Pro (Advanced Reasoning)</option>
+                                                <option value="gemini-2.0-flash-exp">Gemini 2.5 Flash (Balanced)</option>
+                                                <option value="gemini-2.0-flash-lite-preview-02-05">Gemini Flash Lite (Lightweight)</option>
+                                                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Legacy Stable)</option>
+                                                <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Legacy)</option>
                                             </select>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">API Key Específica (Opcional)</label>
                                             <input
                                                 type="password"
-                                                value={profile.chat_gemini_api_key || ''}
+                                                value={profile.chat_gemini_api_key || 'AIzaSyDaO7ij1YvJ60wTFdhw-W6JnadYUwi6H_4'}
                                                 onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_gemini_api_key: e.target.value }))}
                                                 className={`w-full p-5 rounded-[2rem] text-sm font-mono border ${inputClasses}`}
-                                                placeholder="Deixe vazio para usar a chave global"
+                                                placeholder="Usando chave padrão atualizada"
                                             />
                                         </div>
                                     </div>
