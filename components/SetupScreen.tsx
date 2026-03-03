@@ -43,6 +43,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
     const fileInputRef = useRef<HTMLInputElement>(null);
     const userFileInputRef = useRef<HTMLInputElement>(null);
     const historyInputRef = useRef<HTMLInputElement>(null);
+    const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
     const [activeChat, setActiveChatState] = useState<{ profile: UserProfile, isAi: boolean } | null>(() => {
         const saved = sessionStorage.getItem('warm_activeChat');
         return saved ? JSON.parse(saved) : null;
@@ -256,68 +257,92 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
     };
 
     return (
-        <div className={`min-h-screen ${themeClasses} transition-colors duration-700 flex flex-col items-center font-sans tracking-tight`}>
+        <div className={`min-h-screen ${themeClasses} transition-colors duration-700 flex font-sans tracking-tight overflow-x-hidden`}>
 
-            {/* Header - Fixed & Premium */}
-            <header className={`w-full sticky top-0 z-[60] px-6 py-4 flex justify-between items-center ${isLight ? 'bg-white/80' : 'bg-black/40'} backdrop-blur-xl border-b ${isLight ? 'border-slate-100' : 'border-white/5'}`}>
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-xl shadow-lg shadow-blue-500/20">⚡</div>
-                    <div>
-                        <h1 className="text-lg font-black tracking-tighter uppercase italic">WARM <span className="text-blue-600">CONN</span></h1>
-                    </div>
+            {/* Sidebar - Vertical Navigation (Desktop) */}
+            <aside
+                onMouseEnter={() => setIsSidebarExpanded(true)}
+                onMouseLeave={() => setIsSidebarExpanded(false)}
+                className={`fixed left-0 top-0 h-full z-[70] transition-all duration-500 ease-in-out border-r shadow-2xl hidden md:flex ${isSidebarExpanded ? 'w-64' : 'w-20'} ${isLight ? 'bg-white/95 border-slate-100' : 'bg-[#0b0c10]/95 border-white/5'} backdrop-blur-2xl flex-col py-8`}
+            >
+                {/* Logo Section in Sidebar */}
+                <div className={`mb-12 flex items-center gap-3 px-5 transition-all duration-500 ${isSidebarExpanded ? 'justify-start' : 'justify-center'}`}>
+                    <div className="w-10 h-10 rounded-xl bg-blue-600 flex-shrink-0 flex items-center justify-center text-xl shadow-lg shadow-blue-500/20">⚡</div>
+                    {isSidebarExpanded && (
+                        <h1 className="text-lg font-black tracking-tighter uppercase italic truncate animate-in fade-in slide-in-from-left-4 duration-500">
+                            WARM <span className="text-blue-600">CONN</span>
+                        </h1>
+                    )}
                 </div>
-                <div className="flex items-center gap-3">
-                    {user && (
+
+                {/* Navigation Links */}
+                <nav className="flex-1 w-full px-3 space-y-2 overflow-y-auto no-scrollbar">
+                    {[
+                        { id: 'dashboard', label: 'Início', icon: '🏠' },
+                        { id: 'chats', label: 'Chats', icon: '💬' },
+                        { id: 'contacts', label: 'Contatos', icon: '👤' },
+                        { id: 'calendar', label: 'Agenda', icon: '📅' },
+                        { id: 'memory', label: 'Memória', icon: '🧠' },
+                        { id: 'config', label: 'Ajustes', icon: '⚙️' }
+                    ].map(tab => (
                         <button
-                            onClick={() => setShowNotifications(true)}
-                            className={`relative w-10 h-10 rounded-full flex items-center justify-center border transition-all ${cardClasses}`}
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`w-full group relative flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-300 ${activeTab === tab.id
+                                ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
+                                : `opacity-40 hover:opacity-100 ${isLight ? 'hover:bg-slate-100' : 'hover:bg-white/5'}`
+                                }`}
                         >
-                            <span>🔔</span>
-                            {notifications.filter(n => !n.is_read).length > 0 && (
-                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white dark:border-black flex items-center justify-center text-[8px] text-white font-bold">
-                                    {notifications.filter(n => !n.is_read).length}
+                            <span className="text-xl flex-shrink-0 transition-transform group-hover:scale-110">{tab.icon}</span>
+                            {isSidebarExpanded && (
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] truncate animate-in fade-in slide-in-from-left-4 duration-500">
+                                    {tab.label}
                                 </span>
                             )}
+                            {!isSidebarExpanded && (
+                                <div className="absolute left-full ml-4 px-3 py-1 bg-black text-white text-[10px] font-bold uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-[100]">
+                                    {tab.label}
+                                </div>
+                            )}
                         </button>
-                    )}
+                    ))}
+                </nav>
 
-                    {user ? (
-                        <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setShowProfileModal(true)}>
-                            <div className="flex flex-col items-end mr-1">
-                                <span className="text-[11px] font-black uppercase tracking-tighter truncate max-w-[100px]">{currentUserProfile?.display_name || "Usuário"}</span>
-                                <span className="text-[9px] opacity-40 font-bold">{formatDisplayNumber(currentUserProfile?.personal_number || "", false)}</span>
-                            </div>
-                            <div className="w-10 h-10 rounded-xl bg-slate-200 border border-white/10 overflow-hidden shadow-lg transition-transform group-hover:scale-105">
-                                {currentUserProfile?.avatar_url ? (
-                                    <img src={currentUserProfile.avatar_url} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
-                                )}
-                            </div>
-                            <button onClick={(e) => { e.stopPropagation(); supabase.auth.signOut(); }} className="ml-2 p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                </svg>
-                            </button>
-                        </div>
-                    ) : (
-                        <button onClick={() => setShowAuth(true)} className="px-4 py-2 bg-blue-600 text-white rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-blue-500/20">Entrar</button>
-                    )}
+                {/* Theme Toggle at Sidebar Bottom */}
+                <div className="px-3">
                     <button
                         onClick={() => updateProfileAndSync(prev => ({ ...prev, theme: isDark ? 'light' : 'dark' }))}
-                        className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${cardClasses}`}
+                        className={`w-full p-3.5 rounded-2xl flex items-center gap-4 transition-all duration-300 border ${cardClasses} hover:bg-black/5 dark:hover:bg-white/5`}
                     >
-                        {isDark ? '☀️' : '🌙'}
+                        <span className="text-xl flex-shrink-0">{isDark ? '☀️' : '🌙'}</span>
+                        {isSidebarExpanded && (
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] truncate animate-in fade-in slide-in-from-left-4 duration-500">
+                                {isDark ? 'Modo Claro' : 'Modo Escuro'}
+                            </span>
+                        )}
                     </button>
                 </div>
-            </header>
+            </aside>
 
-            {/* Content Container */}
-            <div className="max-w-4xl w-full p-6 flex-1 flex flex-col items-center">
+            {/* Main Content Area */}
+            <div className={`flex-1 flex flex-col transition-all duration-500 ${isSidebarExpanded ? 'md:ml-64' : 'md:ml-20'}`}>
 
-                {/* Main Tabs - Refined Pill Layout */}
-                <nav className="w-full mb-8 sticky top-20 z-50 py-2">
-                    <div className={`p-1.5 rounded-full flex gap-1 overflow-x-auto no-scrollbar ${isLight ? 'bg-slate-200/50' : 'bg-white/5'} border ${isLight ? 'border-white' : 'border-white/5'}`}>
+                {/* Mobile Header (Hidden on Desktop) */}
+                <header className={`md:hidden w-full sticky top-0 z-[60] px-4 py-3 flex justify-between items-center ${isLight ? 'bg-white/80' : 'bg-[#0b0c10]/80'} backdrop-blur-xl border-b ${borderClass}`}>
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-sm shadow-lg shadow-blue-500/20">⚡</div>
+                        <h1 className="text-sm font-black tracking-tighter uppercase italic">WARM <span className="text-blue-600">CONN</span></h1>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => updateProfileAndSync(prev => ({ ...prev, theme: isDark ? 'light' : 'dark' }))} className="w-8 h-8 rounded-full flex items-center justify-center border border-white/10 dark:bg-white/5">
+                            {isDark ? '☀️' : '🌙'}
+                        </button>
+                    </div>
+                </header>
+
+                {/* Mobile Top Navigation (Hidden on Desktop) */}
+                <nav className="md:hidden w-full sticky top-14 z-50 p-2 overflow-x-auto no-scrollbar bg-inherit border-b border-white/5">
+                    <div className="flex gap-2 min-w-max px-2">
                         {[
                             { id: 'dashboard', label: 'Início', icon: '🏠' },
                             { id: 'chats', label: 'Chats', icon: '💬' },
@@ -329,670 +354,716 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex-1 min-w-[80px] px-4 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all duration-500 flex items-center justify-center gap-2 ${activeTab === tab.id
-                                    ? 'bg-white shadow-md text-blue-600 scale-[1.02]'
-                                    : 'opacity-40 hover:opacity-100 hover:bg-white/10 text-inherit'
-                                    }`}
+                                className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'opacity-40 hover:opacity-100 bg-white/5'}`}
                             >
-                                <span className="text-sm">{tab.icon}</span>
-                                <span className="hidden sm:inline">{tab.label}</span>
+                                <span>{tab.icon}</span>
+                                <span>{tab.label}</span>
                             </button>
                         ))}
                     </div>
                 </nav>
 
-                <main className="w-full animate-in fade-in slide-in-from-bottom-6 duration-700">
-                    {activeTab === 'dashboard' && (
-                        <div className="flex flex-col gap-8">
-                            {/* Nicknames and Identity Section */}
-                            <div className={`w-full p-8 rounded-[3rem] border relative overflow-hidden ${cardClasses}`}>
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 blur-[100px] rounded-full" />
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Identidade do Relacionamento</p>
-                                    </div>
+                {/* Top Header - Controls & Profile (Desktop Only) */}
+                <header className={`hidden md:flex w-full sticky top-0 z-[60] px-8 py-6 justify-end items-center ${isLight ? 'bg-[#f9f9fb]/80' : 'bg-[#0b0c10]/40'} backdrop-blur-xl transition-all`}>
+                    <div className="flex items-center gap-5">
+                        {user && (
+                            <button
+                                onClick={() => setShowNotifications(true)}
+                                className={`relative w-12 h-12 rounded-2xl flex items-center justify-center border transition-all ${cardClasses} hover:scale-105 active:scale-95`}
+                            >
+                                <span className="text-xl">🔔</span>
+                                {notifications.filter(n => !n.is_read).length > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-4 border-white dark:border-[#0b0c10] flex items-center justify-center text-[10px] text-white font-black">
+                                        {notifications.filter(n => !n.is_read).length}
+                                    </span>
+                                )}
+                            </button>
+                        )}
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        {/* User Nickname */}
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center px-4">
-                                                <label className="text-[9px] font-black uppercase tracking-widest opacity-30">Seu Apelido Carinhoso</label>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-bold text-blue-500/60 font-mono tracking-tighter">
-                                                        {formatDisplayNumber(currentUserProfile?.personal_number || '', false)}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => copyToClipboard(currentUserProfile?.personal_number || '')}
-                                                        className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-40 hover:opacity-100"
-                                                        title="Copiar Número"
-                                                    >
-                                                        <span className="text-[8px]">📋</span>
-                                                    </button>
+                        {user ? (
+                            <div className="flex items-center gap-4 px-4 py-2 rounded-[2rem] hover:bg-black/5 dark:hover:bg-white/5 transition-all cursor-pointer group" onClick={() => setShowProfileModal(true)}>
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[11px] font-black uppercase tracking-widest truncate max-w-[120px]">{currentUserProfile?.display_name || "Usuário"}</span>
+                                    <span className="text-[9px] opacity-40 font-black tracking-tighter text-blue-600">{formatDisplayNumber(currentUserProfile?.personal_number || "", false)}</span>
+                                </div>
+                                <div className="w-12 h-12 rounded-2xl bg-slate-200 border-2 border-white/20 overflow-hidden shadow-xl transition-transform group-hover:scale-110">
+                                    {currentUserProfile?.avatar_url ? (
+                                        <img src={currentUserProfile.avatar_url} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-2xl">👤</div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); supabase.auth.signOut(); }}
+                                    className="ml-2 w-10 h-10 flex items-center justify-center text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                                    title="Sair"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                </button>
+                            </div>
+                        ) : (
+                            <button onClick={() => setShowAuth(true)} className="px-8 py-3 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all">Iniciar Sessão</button>
+                        )}
+                    </div>
+                </header>
+
+                {/* Dashboard Scroll Area */}
+                <div className="flex-1 overflow-y-auto no-scrollbar pt-4 px-8 pb-24 flex flex-col items-center">
+                    <div className="w-full max-w-5xl animate-in fade-in slide-in-from-bottom-8 duration-700">
+                        {activeTab === 'dashboard' && (
+                            <div className="flex flex-col gap-8">
+                                {/* Nicknames and Identity Section */}
+                                <div className={`w-full p-8 rounded-[3rem] border relative overflow-hidden ${cardClasses}`}>
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 blur-[100px] rounded-full" />
+                                    <div className="relative z-10">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                            <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">Identidade do Relacionamento</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {/* User Nickname */}
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center px-4">
+                                                    <label className="text-[9px] font-black uppercase tracking-widest opacity-30">Seu Apelido Carinhoso</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-bold text-blue-500/60 font-mono tracking-tighter">
+                                                            {formatDisplayNumber(currentUserProfile?.personal_number || '', false)}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => copyToClipboard(currentUserProfile?.personal_number || '')}
+                                                            className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-40 hover:opacity-100"
+                                                            title="Copiar Número"
+                                                        >
+                                                            <span className="text-[8px]">📋</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="text"
+                                                        value={currentUserProfile?.nickname || ''}
+                                                        onChange={(e) => onUpdateUserProfile({ ...currentUserProfile!, nickname: e.target.value })}
+                                                        onBlur={() => saveUserProfile()}
+                                                        className={`w-full p-5 rounded-[2rem] text-sm font-bold border transition-all ${inputClasses} border-opacity-30 focus:border-opacity-100 italic`}
+                                                        placeholder="Como ela te chama? (ex: Bebê, Amor...)"
+                                                    />
+                                                    <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 group-hover:opacity-100 transition-opacity">👤</div>
                                                 </div>
                                             </div>
-                                            <div className="relative group">
-                                                <input
-                                                    type="text"
-                                                    value={currentUserProfile?.nickname || ''}
-                                                    onChange={(e) => onUpdateUserProfile({ ...currentUserProfile!, nickname: e.target.value })}
-                                                    onBlur={() => saveUserProfile()}
-                                                    className={`w-full p-5 rounded-[2rem] text-sm font-bold border transition-all ${inputClasses} border-opacity-30 focus:border-opacity-100 italic`}
-                                                    placeholder="Como ela te chama? (ex: Bebê, Amor...)"
-                                                />
-                                                <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 group-hover:opacity-100 transition-opacity">👤</div>
+
+                                            {/* AI Nickname */}
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center px-4">
+                                                    <label className="text-[9px] font-black uppercase tracking-widest opacity-30">Apelido dela na Relação</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-bold text-pink-500/60 font-mono tracking-tighter">
+                                                            {formatDisplayNumber(profile.ai_number || '', true)}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => copyToClipboard(profile.ai_number || '')}
+                                                            className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-40 hover:opacity-100"
+                                                            title="Copiar Número"
+                                                        >
+                                                            <span className="text-[8px]">📋</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="relative group">
+                                                    <input
+                                                        type="text"
+                                                        value={profile.name || ''}
+                                                        onChange={(e) => updateProfileAndSync(prev => ({ ...prev, name: e.target.value }))}
+                                                        className={`w-full p-5 rounded-[2rem] text-sm font-bold border transition-all ${inputClasses} border-opacity-30 focus:border-opacity-100 italic`}
+                                                        placeholder="Como você a chama? (ex: Vida, Princesa...)"
+                                                    />
+                                                    <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 group-hover:opacity-100 transition-opacity">✨</div>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* AI Nickname */}
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center px-4">
-                                                <label className="text-[9px] font-black uppercase tracking-widest opacity-30">Apelido dela na Relação</label>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-bold text-pink-500/60 font-mono tracking-tighter">
-                                                        {formatDisplayNumber(profile.ai_number || '', true)}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => copyToClipboard(profile.ai_number || '')}
-                                                        className="w-5 h-5 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-40 hover:opacity-100"
-                                                        title="Copiar Número"
-                                                    >
-                                                        <span className="text-[8px]">📋</span>
-                                                    </button>
-                                                </div>
+                                        <div className="mt-8 p-5 rounded-[2.5rem] bg-blue-500/5 border border-blue-500/10 text-center relative overflow-hidden group">
+                                            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                                            <p className="text-[11px] font-bold text-blue-500/60 italic uppercase tracking-wider relative z-10">
+                                                "Qual será o apelido carinhoso de vocês? Defina agora para tornar cada palavra mais especial."
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* Pro Card: Relationship Status */}
+                                    <div className={`p-8 rounded-[3rem] border relative overflow-hidden flex flex-col justify-between min-h-[300px] ${cardClasses}`}>
+                                        <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-[80px] rounded-full" />
+
+                                        <div>
+                                            <div className="flex justify-between items-center mb-6">
+                                                <p className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-30">Vínculo Emocional</p>
+                                                <span className={`text-sm px-3 py-1 rounded-lg font-bold bg-blue-500/10 ${status.color}`}>
+                                                    {status.label}
+                                                </span>
                                             </div>
-                                            <div className="relative group">
-                                                <input
-                                                    type="text"
-                                                    value={profile.name || ''}
-                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, name: e.target.value }))}
-                                                    className={`w-full p-5 rounded-[2rem] text-sm font-bold border transition-all ${inputClasses} border-opacity-30 focus:border-opacity-100 italic`}
-                                                    placeholder="Como você a chama? (ex: Vida, Princesa...)"
-                                                />
-                                                <div className="absolute right-5 top-1/2 -translate-y-1/2 opacity-20 group-hover:opacity-100 transition-opacity">✨</div>
+                                            <h2 className="text-5xl font-black tracking-tighter mb-4 italic">
+                                                {profile.relationshipScore}% <span className="text-lg font-bold not-italic opacity-20">SCORE</span>
+                                            </h2>
+                                            <div className="w-full h-1.5 bg-slate-100/10 rounded-full overflow-hidden mb-6">
+                                                <div className={`h-full transition-all duration-1000 ${status.bar}`} style={{ width: `${profile.relationshipScore}%` }} />
                                             </div>
+                                        </div>
+
+                                        <div className={`p-5 rounded-[2rem] bg-blue-500/5 border border-blue-500/10 transition-all hover:bg-blue-500/10`}>
+                                            <p className="text-xs leading-relaxed font-medium italic opacity-70">
+                                                <span className="text-blue-500 font-bold not-italic uppercase mr-2 text-[10px]">Sugestão:</span>
+                                                "{status.tip}"
+                                            </p>
                                         </div>
                                     </div>
 
-                                    <div className="mt-8 p-5 rounded-[2.5rem] bg-blue-500/5 border border-blue-500/10 text-center relative overflow-hidden group">
-                                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                                        <p className="text-[11px] font-bold text-blue-500/60 italic uppercase tracking-wider relative z-10">
-                                            "Qual será o apelido carinhoso de vocês? Defina agora para tornar cada palavra mais especial."
-                                        </p>
+                                    {/* Call Control Center */}
+                                    <div className="flex flex-col gap-6">
+                                        {/* Identification Profiles */}
+                                        <div className={`p-6 rounded-[3rem] border flex items-center justify-between ${cardClasses}`}>
+                                            <div className="flex items-center gap-3 w-[40%]">
+                                                <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800">
+                                                    {currentUserProfile?.avatar_url ? (
+                                                        <img src={currentUserProfile.avatar_url} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
+                                                    )}
+                                                </div>
+                                                <div className="overflow-hidden">
+                                                    <p className="text-[10px] font-bold uppercase opacity-40">Você</p>
+                                                    <p className="text-sm font-black truncate">{currentUserProfile?.nickname || currentUserProfile?.display_name || "Usuário"}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex-1 flex justify-center">
+                                                <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                                    <span className="text-blue-500 text-xs">⚡</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3 text-right justify-end w-[40%]">
+                                                <div className="overflow-hidden">
+                                                    <p className="text-[10px] font-bold uppercase opacity-40">IA</p>
+                                                    <p className="text-sm font-black text-blue-600 dark:text-blue-400 truncate">{profile.name || "Amor"}</p>
+                                                </div>
+                                                <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-blue-100 dark:border-blue-900">
+                                                    {profile.image ? (
+                                                        <img src={profile.image} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-xl">📸</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className={`p-8 rounded-[3rem] border flex flex-col gap-6 ${cardClasses} transform hover:scale-[1.02] transition-all cursor-pointer shadow-2xl shadow-blue-500/5`} onClick={onStartCall}>
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl shadow-xl shadow-blue-500/40 animate-pulse">
+                                                        📞
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-xl font-black tracking-tight">Iniciar Chamada</h3>
+                                                        <p className="text-xs opacity-40 font-bold uppercase tracking-widest mt-0.5">Conexão via Voz AI</p>
+                                                    </div>
+                                                </div>
+                                                <span className="text-2xl opacity-20 group-hover:opacity-100 transition-opacity">→</span>
+                                            </div>
+                                        </div>
+
+                                        <div className={`p-8 rounded-[2.5rem] border ${cardClasses} flex-1`}>
+                                            <div className="flex justify-between items-start mb-6">
+                                                <p className="text-[11px] font-bold uppercase tracking-widest opacity-30">Status do Sistema</p>
+                                                <div className="flex gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                    <div className="w-2 h-2 rounded-full bg-emerald-500/30" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-4 rounded-2xl">
+                                                    <span className="text-xs font-bold opacity-30">Próxima Ligação</span>
+                                                    <span className="text-sm font-bold text-blue-500">{nextScheduledCall ? formatTime(nextScheduledCall.triggerTime - Date.now()) : "Não Agendada"}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-4 rounded-2xl">
+                                                    <span className="text-xs font-bold opacity-30">Eficiência de Contato</span>
+                                                    <span className="text-sm font-bold">94.8%</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* Pro Card: Relationship Status */}
-                                <div className={`p-8 rounded-[3rem] border relative overflow-hidden flex flex-col justify-between min-h-[300px] ${cardClasses}`}>
-                                    <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-[80px] rounded-full" />
+                        {activeTab === 'calendar' && user && (
+                            <div className="w-full max-w-2xl mx-auto"><CalendarTab user={user} profile={profile} setProfile={setProfile} currentUserProfile={currentUserProfile} isDark={isDark} /></div>
+                        )}
 
-                                    <div>
-                                        <div className="flex justify-between items-center mb-6">
-                                            <p className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-30">Vínculo Emocional</p>
-                                            <span className={`text-sm px-3 py-1 rounded-lg font-bold bg-blue-500/10 ${status.color}`}>
-                                                {status.label}
-                                            </span>
-                                        </div>
-                                        <h2 className="text-5xl font-black tracking-tighter mb-4 italic">
-                                            {profile.relationshipScore}% <span className="text-lg font-bold not-italic opacity-20">SCORE</span>
-                                        </h2>
-                                        <div className="w-full h-1.5 bg-slate-100/10 rounded-full overflow-hidden mb-6">
-                                            <div className={`h-full transition-all duration-1000 ${status.bar}`} style={{ width: `${profile.relationshipScore}%` }} />
-                                        </div>
-                                    </div>
+                        {activeTab === 'memory' && user && (
+                            <div className="w-full"><MemoryHistorySection user={user} profile={profile} currentUserProfile={currentUserProfile} isDark={isDark} /></div>
+                        )}
 
-                                    <div className={`p-5 rounded-[2rem] bg-blue-500/5 border border-blue-500/10 transition-all hover:bg-blue-500/10`}>
-                                        <p className="text-xs leading-relaxed font-medium italic opacity-70">
-                                            <span className="text-blue-500 font-bold not-italic uppercase mr-2 text-[10px]">Sugestão:</span>
-                                            "{status.tip}"
-                                        </p>
-                                    </div>
-                                </div>
+                        {activeTab === 'contacts' && user && (
+                            <div className="flex-1 w-full max-w-5xl overflow-y-auto no-scrollbar pb-24">
+                                <ContactList currentUser={user} onCallPartner={onCallPartner} onOpenChat={(target, isAi) => setActiveChat({ profile: target, isAi })} isDark={isDark} />
+                            </div>
+                        )}
 
-                                {/* Call Control Center */}
-                                <div className="flex flex-col gap-6">
-                                    {/* Identification Profiles */}
-                                    <div className={`p-6 rounded-[3rem] border flex items-center justify-between ${cardClasses}`}>
-                                        <div className="flex items-center gap-3 w-[40%]">
-                                            <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800">
-                                                {currentUserProfile?.avatar_url ? (
-                                                    <img src={currentUserProfile.avatar_url} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
-                                                )}
-                                            </div>
-                                            <div className="overflow-hidden">
-                                                <p className="text-[10px] font-bold uppercase opacity-40">Você</p>
-                                                <p className="text-sm font-black truncate">{currentUserProfile?.nickname || currentUserProfile?.display_name || "Usuário"}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex-1 flex justify-center">
-                                            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                                <span className="text-blue-500 text-xs">⚡</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-3 text-right justify-end w-[40%]">
-                                            <div className="overflow-hidden">
-                                                <p className="text-[10px] font-bold uppercase opacity-40">IA</p>
-                                                <p className="text-sm font-black text-blue-600 dark:text-blue-400 truncate">{profile.name || "Amor"}</p>
-                                            </div>
-                                            <div className="w-12 h-12 flex-shrink-0 rounded-full overflow-hidden bg-slate-200 dark:bg-slate-800 border-2 border-blue-100 dark:border-blue-900">
-                                                {profile.image ? (
+                        {activeTab === 'config' && (
+                            <div className="space-y-8 pb-20 max-w-2xl mx-auto">
+                                {/* Profile Header Settings */}
+                                <div className="flex flex-col items-center mb-12">
+                                    <div className="relative group">
+                                        <div
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className={`w-36 h-36 rounded-[3.5rem] p-1 border-2 border-blue-500 shadow-2xl cursor-pointer transition-all overflow-hidden bg-white dark:bg-white/5`}
+                                        >
+                                            <div className="w-full h-full rounded-[3rem] overflow-hidden flex items-center justify-center">
+                                                {isSavingImage ? (
+                                                    <span className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                                ) : profile.image ? (
                                                     <img src={profile.image} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xl">📸</div>
+                                                    <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">📷</div>
                                                 )}
                                             </div>
                                         </div>
+                                        <div className="absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center border-4 border-[#f9f9fb] dark:border-[#0b0c10] shadow-lg pointer-events-none">✏️</div>
+                                        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                                     </div>
-
-                                    <div className={`p-8 rounded-[3rem] border flex flex-col gap-6 ${cardClasses} transform hover:scale-[1.02] transition-all cursor-pointer shadow-2xl shadow-blue-500/5`} onClick={onStartCall}>
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-3xl shadow-xl shadow-blue-500/40 animate-pulse">
-                                                    📞
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-xl font-black tracking-tight">Iniciar Chamada</h3>
-                                                    <p className="text-xs opacity-40 font-bold uppercase tracking-widest mt-0.5">Conexão via Voz AI</p>
-                                                </div>
-                                            </div>
-                                            <span className="text-2xl opacity-20 group-hover:opacity-100 transition-opacity">→</span>
-                                        </div>
-                                    </div>
-
-                                    <div className={`p-8 rounded-[2.5rem] border ${cardClasses} flex-1`}>
-                                        <div className="flex justify-between items-start mb-6">
-                                            <p className="text-[11px] font-bold uppercase tracking-widest opacity-30">Status do Sistema</p>
-                                            <div className="flex gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                                <div className="w-2 h-2 rounded-full bg-emerald-500/30" />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-4 rounded-2xl">
-                                                <span className="text-xs font-bold opacity-30">Próxima Ligação</span>
-                                                <span className="text-sm font-bold text-blue-500">{nextScheduledCall ? formatTime(nextScheduledCall.triggerTime - Date.now()) : "Não Agendada"}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center bg-black/5 dark:bg-white/5 p-4 rounded-2xl">
-                                                <span className="text-xs font-bold opacity-30">Eficiência de Contato</span>
-                                                <span className="text-sm font-bold">94.8%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'calendar' && user && (
-                        <div className="w-full max-w-2xl mx-auto"><CalendarTab user={user} profile={profile} setProfile={setProfile} currentUserProfile={currentUserProfile} isDark={isDark} /></div>
-                    )}
-
-                    {activeTab === 'memory' && user && (
-                        <div className="w-full"><MemoryHistorySection user={user} profile={profile} currentUserProfile={currentUserProfile} isDark={isDark} /></div>
-                    )}
-
-                    {activeTab === 'contacts' && user && (
-                        <div className="flex-1 w-full max-w-5xl overflow-y-auto no-scrollbar pb-24">
-                            <ContactList currentUser={user} onCallPartner={onCallPartner} onOpenChat={(target, isAi) => setActiveChat({ profile: target, isAi })} isDark={isDark} />
-                        </div>
-                    )}
-
-                    {activeTab === 'config' && (
-                        <div className="space-y-8 pb-20 max-w-2xl mx-auto">
-                            {/* Profile Header Settings */}
-                            <div className="flex flex-col items-center mb-12">
-                                <div className="relative group">
-                                    <div
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className={`w-36 h-36 rounded-[3.5rem] p-1 border-2 border-blue-500 shadow-2xl cursor-pointer transition-all overflow-hidden bg-white dark:bg-white/5`}
-                                    >
-                                        <div className="w-full h-full rounded-[3rem] overflow-hidden flex items-center justify-center">
-                                            {isSavingImage ? (
-                                                <span className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                                            ) : profile.image ? (
-                                                <img src={profile.image} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">📷</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="absolute -bottom-1 -right-1 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center border-4 border-[#f9f9fb] dark:border-[#0b0c10] shadow-lg pointer-events-none">✏️</div>
-                                    <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                </div>
-                                <input
-                                    type="text"
-                                    value={profile.name}
-                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, name: e.target.value }))}
-                                    className="mt-6 text-3xl font-black italic tracking-tighter bg-transparent border-none text-center outline-none w-full"
-                                    placeholder="NOME DA PARCEIRA"
-                                />
-                                <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-30 mt-2">Personalização da Identidade</p>
-
-                                <div className="grid grid-cols-2 gap-4 mt-8 w-full max-w-sm">
-                                    <div className="flex flex-col items-center">
-                                        <input
-                                            type="text"
-                                            value={profile.gender}
-                                            onChange={(e) => updateProfileAndSync(prev => ({ ...prev, gender: e.target.value }))}
-                                            className="text-lg font-bold italic tracking-tighter bg-transparent border-b border-blue-500/20 text-center outline-none w-full pb-1 focus:border-blue-500 transition-colors"
-                                            placeholder="GÊNERO"
-                                        />
-                                        <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mt-2">Gênero</p>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <input
-                                            type="text"
-                                            value={profile.sexuality}
-                                            onChange={(e) => updateProfileAndSync(prev => ({ ...prev, sexuality: e.target.value }))}
-                                            className="text-lg font-bold italic tracking-tighter bg-transparent border-b border-blue-500/20 text-center outline-none w-full pb-1 focus:border-blue-500 transition-colors"
-                                            placeholder="SEXUALIDADE"
-                                        />
-                                        <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mt-2">Sexualidade</p>
-                                    </div>
-                                </div>
-
-                                <div className="mt-8 flex flex-col items-center w-full max-w-sm">
                                     <input
                                         type="text"
-                                        value={profile.bestFriend}
-                                        onChange={(e) => updateProfileAndSync(prev => ({ ...prev, bestFriend: e.target.value }))}
-                                        className="text-lg font-bold italic tracking-tighter bg-transparent border-b border-blue-500/20 text-center outline-none w-full pb-1 focus:border-blue-500 transition-colors"
-                                        placeholder="MELHOR AMIGO"
+                                        value={profile.name}
+                                        onChange={(e) => updateProfileAndSync(prev => ({ ...prev, name: e.target.value }))}
+                                        className="mt-6 text-3xl font-black italic tracking-tighter bg-transparent border-none text-center outline-none w-full"
+                                        placeholder="NOME DA PARCEIRA"
                                     />
-                                    <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mt-2">Melhor Amigo (Alfa)</p>
-                                </div>
-                            </div>
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-30 mt-2">Personalização da Identidade</p>
 
-                            {/* Section: Gemini Vision */}
-                            <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-3xl rounded-full" />
-                                <div className="flex justify-between items-center mb-8">
-                                    <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">Gemini Engine AI</h3>
-                                    <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${apiStatus === 'valid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-                                        {apiStatus === 'valid' ? 'Conectado ✓' : 'Desconectado ✕'}
-                                    </div>
-                                </div>
-                                <div className="space-y-6">
-                                    <div className="relative">
-                                        <input
-                                            type="password"
-                                            value={apiKey}
-                                            onChange={(e) => { setApiKey(e.target.value); setApiStatus('idle'); }}
-                                            onBlur={() => validateApiKey(apiKey)}
-                                            className={`w-full p-5 rounded-[2rem] text-sm font-mono border ${inputClasses}`}
-                                            placeholder="Enter Gemini API Key..."
-                                        />
-                                        <button onClick={() => validateApiKey(apiKey)} className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-600 font-bold text-xs hover:scale-105 transition-all">VERIFICAR</button>
-                                    </div>
-                                    <div className="flex justify-between items-center px-2">
-                                        <p className="text-[9px] font-bold opacity-30 uppercase tracking-widest leading-loose">Chave criptografada localmente.</p>
-                                        <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-[10px] font-black text-blue-600 hover:opacity-70 transition-opacity">PEGAR CHAVE GRÁTIS →</a>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section: Chat AI Engine (Independent) */}
-                            <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-pink-600/5 blur-3xl rounded-full" />
-                                <div className="flex justify-between items-center mb-8">
-                                    <div>
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-pink-600">Chat AI Engine</h3>
-                                        <p className="text-[9px] font-bold opacity-30 uppercase mt-1 tracking-widest">Motor independente para mensagens de texto</p>
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${profile.chat_gemini_api_key ? 'bg-emerald-500/10 text-emerald-500' : 'bg-white/5 opacity-50'}`}>
-                                        {profile.chat_gemini_api_key ? 'Configurado ✓' : 'Usando Global'}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">Modelo do Chat</label>
-                                            <select
-                                                value={profile.chat_model || 'gemini-1.5-flash-latest'}
-                                                onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_model: e.target.value }))}
-                                                className={`w-full p-5 rounded-[2rem] text-sm font-bold border ${inputClasses} appearance-none cursor-pointer`}
-                                            >
-                                                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Rápido & Estável)</option>
-                                                <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Inteligência Superior)</option>
-                                                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Nova Geração)</option>
-                                                <option value="gemini-2.0-flash-lite-preview-02-05">Gemini 2.0 Flash Lite (Ultra Rápido)</option>
-                                                <option value="gemini-1.0-pro">Gemini 1.0 Pro (Econômico)</option>
-                                            </select>
+                                    <div className="grid grid-cols-2 gap-4 mt-8 w-full max-w-sm">
+                                        <div className="flex flex-col items-center">
+                                            <input
+                                                type="text"
+                                                value={profile.gender}
+                                                onChange={(e) => updateProfileAndSync(prev => ({ ...prev, gender: e.target.value }))}
+                                                className="text-lg font-bold italic tracking-tighter bg-transparent border-b border-blue-500/20 text-center outline-none w-full pb-1 focus:border-blue-500 transition-colors"
+                                                placeholder="GÊNERO"
+                                            />
+                                            <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mt-2">Gênero</p>
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">API Key Específica (Opcional)</label>
+                                        <div className="flex flex-col items-center">
+                                            <input
+                                                type="text"
+                                                value={profile.sexuality}
+                                                onChange={(e) => updateProfileAndSync(prev => ({ ...prev, sexuality: e.target.value }))}
+                                                className="text-lg font-bold italic tracking-tighter bg-transparent border-b border-blue-500/20 text-center outline-none w-full pb-1 focus:border-blue-500 transition-colors"
+                                                placeholder="SEXUALIDADE"
+                                            />
+                                            <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mt-2">Sexualidade</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 flex flex-col items-center w-full max-w-sm">
+                                        <input
+                                            type="text"
+                                            value={profile.bestFriend}
+                                            onChange={(e) => updateProfileAndSync(prev => ({ ...prev, bestFriend: e.target.value }))}
+                                            className="text-lg font-bold italic tracking-tighter bg-transparent border-b border-blue-500/20 text-center outline-none w-full pb-1 focus:border-blue-500 transition-colors"
+                                            placeholder="MELHOR AMIGO"
+                                        />
+                                        <p className="text-[8px] font-black uppercase tracking-widest opacity-20 mt-2">Melhor Amigo (Alfa)</p>
+                                    </div>
+                                </div>
+
+                                {/* Section: Gemini Vision */}
+                                <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-3xl rounded-full" />
+                                    <div className="flex justify-between items-center mb-8">
+                                        <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">Gemini Engine AI</h3>
+                                        <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${apiStatus === 'valid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                                            {apiStatus === 'valid' ? 'Conectado ✓' : 'Desconectado ✕'}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-6">
+                                        <div className="relative">
                                             <input
                                                 type="password"
-                                                value={profile.chat_gemini_api_key || 'AIzaSyDaO7ij1YvJ60wTFdhw-W6JnadYUwi6H_4'}
-                                                onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_gemini_api_key: e.target.value }))}
+                                                value={apiKey}
+                                                onChange={(e) => { setApiKey(e.target.value); setApiStatus('idle'); }}
+                                                onBlur={() => validateApiKey(apiKey)}
                                                 className={`w-full p-5 rounded-[2rem] text-sm font-mono border ${inputClasses}`}
-                                                placeholder="Usando chave padrão atualizada"
+                                                placeholder="Enter Gemini API Key..."
                                             />
+                                            <button onClick={() => validateApiKey(apiKey)} className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-600 font-bold text-xs hover:scale-105 transition-all">VERIFICAR</button>
+                                        </div>
+                                        <div className="flex justify-between items-center px-2">
+                                            <p className="text-[9px] font-bold opacity-30 uppercase tracking-widest leading-loose">Chave criptografada localmente.</p>
+                                            <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-[10px] font-black text-blue-600 hover:opacity-70 transition-opacity">PEGAR CHAVE GRÁTIS →</a>
                                         </div>
                                     </div>
-                                    <p className="text-[9px] font-medium opacity-30 px-4 italic leading-relaxed text-center">
-                                        Isso permite que você use uma chave ou modelo diferente para o chat de texto, sem afetar a performance da chamada de voz.
-                                    </p>
                                 </div>
-                            </div>
 
-                            {/* Section: Voice & Accent */}
-                            <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
-                                <h3 className="text-sm font-bold uppercase tracking-widest mb-10 opacity-30">Voz & Sotaque Profissional</h3>
-
-                                <div className="space-y-10">
-                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                        {Object.entries(ACCENT_META).map(([key, meta]) => (
-                                            <button
-                                                key={key}
-                                                onClick={() => updateProfileAndSync(prev => ({ ...prev, accent: key as Accent }))}
-                                                className={`p-3 rounded-2xl border flex flex-col items-center gap-3 transition-all ${profile.accent === key ? 'border-blue-600 bg-blue-600/5' : 'border-slate-100 hover:border-blue-300'}`}
-                                            >
-                                                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md">
-                                                    <img src={meta.flagUrl} className="w-full h-full object-cover" />
-                                                </div>
-                                                <span className="text-[10px] font-bold uppercase tracking-tighter opacity-70">{meta.label}</span>
-                                            </button>
-                                        ))}
+                                {/* Section: Chat AI Engine (Independent) */}
+                                <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-pink-600/5 blur-3xl rounded-full" />
+                                    <div className="flex justify-between items-center mb-8">
+                                        <div>
+                                            <h3 className="text-sm font-bold uppercase tracking-widest text-pink-600">Chat AI Engine</h3>
+                                            <p className="text-[9px] font-bold opacity-30 uppercase mt-1 tracking-widest">Motor independente para mensagens de texto</p>
+                                        </div>
+                                        <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${profile.chat_gemini_api_key ? 'bg-emerald-500/10 text-emerald-500' : 'bg-white/5 opacity-50'}`}>
+                                            {profile.chat_gemini_api_key ? 'Configurado ✓' : 'Usando Global'}
+                                        </div>
                                     </div>
 
                                     <div className="space-y-6">
-                                        <div>
-                                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 text-center">Timbres Femininos</p>
-                                            <div className="flex flex-wrap justify-center gap-2">
-                                                {Object.values(VoiceName).filter(v => VOICE_META[v].gender === 'Female').map(voice => (
-                                                    <button
-                                                        key={voice}
-                                                        onClick={() => updateProfileAndSync(prev => ({ ...prev, voice }))}
-                                                        className={`px-5 py-3 rounded-full text-[11px] font-bold border transition-all ${profile.voice === voice ? 'bg-rose-600 border-rose-600 text-white shadow-xl shadow-rose-600/20 scale-105' : 'border-slate-100 hover:bg-slate-50'}`}
-                                                    >
-                                                        {voice}
-                                                    </button>
-                                                ))}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">Modelo do Chat</label>
+                                                <select
+                                                    value={profile.chat_model || 'gemini-1.5-flash-latest'}
+                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_model: e.target.value }))}
+                                                    className={`w-full p-5 rounded-[2rem] text-sm font-bold border ${inputClasses} appearance-none cursor-pointer`}
+                                                >
+                                                    <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Rápido & Estável)</option>
+                                                    <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Inteligência Superior)</option>
+                                                    <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Nova Geração)</option>
+                                                    <option value="gemini-2.0-flash-lite-preview-02-05">Gemini 2.0 Flash Lite (Ultra Rápido)</option>
+                                                    <option value="gemini-1.0-pro">Gemini 1.0 Pro (Econômico)</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">API Key Específica (Opcional)</label>
+                                                <input
+                                                    type="password"
+                                                    value={profile.chat_gemini_api_key || 'AIzaSyDaO7ij1YvJ60wTFdhw-W6JnadYUwi6H_4'}
+                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_gemini_api_key: e.target.value }))}
+                                                    className={`w-full p-5 rounded-[2rem] text-sm font-mono border ${inputClasses}`}
+                                                    placeholder="Usando chave padrão atualizada"
+                                                />
                                             </div>
                                         </div>
-                                        <div>
-                                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 text-center">Timbres Masculinos</p>
-                                            <div className="flex flex-wrap justify-center gap-2">
-                                                {Object.values(VoiceName).filter(v => VOICE_META[v].gender === 'Male').map(voice => (
-                                                    <button
-                                                        key={voice}
-                                                        onClick={() => updateProfileAndSync(prev => ({ ...prev, voice }))}
-                                                        className={`px-5 py-3 rounded-full text-[11px] font-bold border transition-all ${profile.voice === voice ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-600/20 scale-105' : 'border-slate-100 hover:bg-slate-50'}`}
-                                                    >
-                                                        {voice}
-                                                    </button>
-                                                ))}
+                                        <p className="text-[9px] font-medium opacity-30 px-4 italic leading-relaxed text-center">
+                                            Isso permite que você use uma chave ou modelo diferente para o chat de texto, sem afetar a performance da chamada de voz.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Section: Voice & Accent */}
+                                <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
+                                    <h3 className="text-sm font-bold uppercase tracking-widest mb-10 opacity-30">Voz & Sotaque Profissional</h3>
+
+                                    <div className="space-y-10">
+                                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                            {Object.entries(ACCENT_META).map(([key, meta]) => (
+                                                <button
+                                                    key={key}
+                                                    onClick={() => updateProfileAndSync(prev => ({ ...prev, accent: key as Accent }))}
+                                                    className={`p-3 rounded-2xl border flex flex-col items-center gap-3 transition-all ${profile.accent === key ? 'border-blue-600 bg-blue-600/5' : 'border-slate-100 hover:border-blue-300'}`}
+                                                >
+                                                    <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md">
+                                                        <img src={meta.flagUrl} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold uppercase tracking-tighter opacity-70">{meta.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="space-y-6">
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 text-center">Timbres Femininos</p>
+                                                <div className="flex flex-wrap justify-center gap-2">
+                                                    {Object.values(VoiceName).filter(v => VOICE_META[v].gender === 'Female').map(voice => (
+                                                        <button
+                                                            key={voice}
+                                                            onClick={() => updateProfileAndSync(prev => ({ ...prev, voice }))}
+                                                            className={`px-5 py-3 rounded-full text-[11px] font-bold border transition-all ${profile.voice === voice ? 'bg-rose-600 border-rose-600 text-white shadow-xl shadow-rose-600/20 scale-105' : 'border-slate-100 hover:bg-slate-50'}`}
+                                                        >
+                                                            {voice}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 text-center">Timbres Masculinos</p>
+                                                <div className="flex flex-wrap justify-center gap-2">
+                                                    {Object.values(VoiceName).filter(v => VOICE_META[v].gender === 'Male').map(voice => (
+                                                        <button
+                                                            key={voice}
+                                                            onClick={() => updateProfileAndSync(prev => ({ ...prev, voice }))}
+                                                            className={`px-5 py-3 rounded-full text-[11px] font-bold border transition-all ${profile.voice === voice ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-600/20 scale-105' : 'border-slate-100 hover:bg-slate-50'}`}
+                                                        >
+                                                            {voice}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Section: Language & Globalization */}
-                            <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
-                                <h3 className="text-sm font-bold uppercase tracking-widest mb-10 opacity-30">Idiomas e Globalização</h3>
+                                {/* Section: Language & Globalization */}
+                                <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
+                                    <h3 className="text-sm font-bold uppercase tracking-widest mb-10 opacity-30">Idiomas e Globalização</h3>
 
-                                <div className="space-y-8">
-                                    <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 ml-2">Idioma da Inteligência Artificial</p>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                            {Object.entries(LANGUAGE_META).map(([key, meta]) => (
+                                    <div className="space-y-8">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 ml-2">Idioma da Inteligência Artificial</p>
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                {Object.entries(LANGUAGE_META).map(([key, meta]) => (
+                                                    <button
+                                                        key={key}
+                                                        onClick={() => updateProfileAndSync(prev => ({ ...prev, language: key as PlatformLanguage }))}
+                                                        className={`p-4 rounded-2xl flex items-center justify-center gap-3 transition-all border ${profile.language === key ? 'border-blue-600 bg-blue-600/5 shadow-inner' : 'border-slate-100 hover:border-blue-300 dark:border-white/5 dark:hover:border-white/20'}`}
+                                                    >
+                                                        <span className="text-lg">{meta.flag}</span>
+                                                        <span className="text-xs font-bold uppercase tracking-widest opacity-70">{meta.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 ml-2">Idioma da Plataforma (Interface)</p>
+                                            <p className="text-[9px] font-medium opacity-40 ml-2 mb-4 italic">Esta configuração altera apenas o conteúdo visual do aplicativo (Em breve).</p>
+                                            {/* For now we can keep it disabled as a UI element until localized properly. If requested, just mock it. */}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Section: Personality & Context */}
+                                <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
+                                    <h3 className="text-sm font-bold uppercase tracking-widest mb-10 opacity-30">Motor de Personalidade</h3>
+                                    <div className="space-y-8">
+                                        <div>
+                                            <label className="text-[10px] font-bold uppercase tracking-widest text-blue-600 block mb-4 ml-4">Prompt de Comportamento</label>
+                                            <textarea
+                                                value={profile.personality}
+                                                onChange={(e) => updateProfileAndSync(prev => ({ ...prev, personality: e.target.value }))}
+                                                className={`w-full h-40 rounded-[2.5rem] p-8 text-[13px] font-medium border focus:outline-none transition-all resize-none ${inputClasses}`}
+                                                placeholder="Descreva detalhadamente como a IA deve agir..."
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {Object.values(CallbackIntensity).map((intensity) => (
                                                 <button
-                                                    key={key}
-                                                    onClick={() => updateProfileAndSync(prev => ({ ...prev, language: key as PlatformLanguage }))}
-                                                    className={`p-4 rounded-2xl flex items-center justify-center gap-3 transition-all border ${profile.language === key ? 'border-blue-600 bg-blue-600/5 shadow-inner' : 'border-slate-100 hover:border-blue-300 dark:border-white/5 dark:hover:border-white/20'}`}
+                                                    key={intensity}
+                                                    onClick={() => updateProfileAndSync(prev => ({ ...prev, intensity }))}
+                                                    className={`py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest border transition-all ${profile.intensity === intensity ? 'bg-black text-white' : 'border-slate-100 hover:bg-slate-50'}`}
                                                 >
-                                                    <span className="text-lg">{meta.flag}</span>
-                                                    <span className="text-xs font-bold uppercase tracking-widest opacity-70">{meta.label}</span>
+                                                    {intensity}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 ml-2">Idioma da Plataforma (Interface)</p>
-                                        <p className="text-[9px] font-medium opacity-40 ml-2 mb-4 italic">Esta configuração altera apenas o conteúdo visual do aplicativo (Em breve).</p>
-                                        {/* For now we can keep it disabled as a UI element until localized properly. If requested, just mock it. */}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section: Personality & Context */}
-                            <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
-                                <h3 className="text-sm font-bold uppercase tracking-widest mb-10 opacity-30">Motor de Personalidade</h3>
-                                <div className="space-y-8">
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-widest text-blue-600 block mb-4 ml-4">Prompt de Comportamento</label>
-                                        <textarea
-                                            value={profile.personality}
-                                            onChange={(e) => updateProfileAndSync(prev => ({ ...prev, personality: e.target.value }))}
-                                            className={`w-full h-40 rounded-[2.5rem] p-8 text-[13px] font-medium border focus:outline-none transition-all resize-none ${inputClasses}`}
-                                            placeholder="Descreva detalhadamente como a IA deve agir..."
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {Object.values(CallbackIntensity).map((intensity) => (
-                                            <button
-                                                key={intensity}
-                                                onClick={() => updateProfileAndSync(prev => ({ ...prev, intensity }))}
-                                                className={`py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest border transition-all ${profile.intensity === intensity ? 'bg-black text-white' : 'border-slate-100 hover:bg-slate-50'}`}
-                                            >
-                                                {intensity}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section: Relational Tracking */}
-                            <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
-                                <div className="flex justify-between items-center mb-10">
-                                    <h3 className="text-sm font-bold uppercase tracking-widest opacity-30">Relacionamentos & Vínculos</h3>
-                                    <span className="text-[9px] font-black px-2 py-0.5 bg-blue-500/10 text-blue-500 rounded-lg">PROTOCOLO ALFA</span>
                                 </div>
 
-                                <div className="space-y-12">
-                                    {/* Original Partner */}
-                                    <div className={`p-6 rounded-[2rem] border ${inputClasses} border-opacity-30`}>
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <span className="text-lg">🧬</span>
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Parceiro Originário</p>
-                                                <p className="text-[8px] opacity-40 uppercase font-bold tracking-tighter">Vínculo Primário Imutável</p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Apelido Original</p>
-                                                <input
-                                                    type="text"
-                                                    value={profile.originalPartnerNickname}
-                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, originalPartnerNickname: e.target.value }))}
-                                                    className="bg-transparent border-none font-bold text-sm outline-none w-full"
-                                                />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">ID Originário</p>
-                                                <input
-                                                    type="text"
-                                                    value={profile.originalPartnerId}
-                                                    className="bg-transparent border-none font-mono text-[10px] opacity-50 outline-none w-full"
-                                                    readOnly
-                                                />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Número Original</p>
-                                                <input
-                                                    type="text"
-                                                    value={profile.originalPartnerNumber}
-                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, originalPartnerNumber: e.target.value }))}
-                                                    className="bg-transparent border-none font-mono text-sm outline-none w-full italic"
-                                                />
-                                            </div>
-                                        </div>
+                                {/* Section: Relational Tracking */}
+                                <div className={`p-10 rounded-[3rem] border ${cardClasses}`}>
+                                    <div className="flex justify-between items-center mb-10">
+                                        <h3 className="text-sm font-bold uppercase tracking-widest opacity-30">Relacionamentos & Vínculos</h3>
+                                        <span className="text-[9px] font-black px-2 py-0.5 bg-blue-500/10 text-blue-500 rounded-lg">PROTOCOLO ALFA</span>
                                     </div>
 
-                                    {/* Current Partner */}
-                                    <div className={`p-6 rounded-[2rem] border ${inputClasses} border-blue-500/10 bg-blue-500/[0.02]`}>
-                                        <div className="flex items-center gap-3 mb-6">
-                                            <span className="text-lg">💞</span>
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-pink-500">Parceiro Atual</p>
-                                                <p className="text-[8px] opacity-40 uppercase font-bold tracking-tighter">Foco de Interação em Tempo Real</p>
+                                    <div className="space-y-12">
+                                        {/* Original Partner */}
+                                        <div className={`p-6 rounded-[2rem] border ${inputClasses} border-opacity-30`}>
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <span className="text-lg">🧬</span>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Parceiro Originário</p>
+                                                    <p className="text-[8px] opacity-40 uppercase font-bold tracking-tighter">Vínculo Primário Imutável</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Apelido Original</p>
+                                                    <input
+                                                        type="text"
+                                                        value={profile.originalPartnerNickname}
+                                                        onChange={(e) => updateProfileAndSync(prev => ({ ...prev, originalPartnerNickname: e.target.value }))}
+                                                        className="bg-transparent border-none font-bold text-sm outline-none w-full"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">ID Originário</p>
+                                                    <input
+                                                        type="text"
+                                                        value={profile.originalPartnerId}
+                                                        className="bg-transparent border-none font-mono text-[10px] opacity-50 outline-none w-full"
+                                                        readOnly
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Número Original</p>
+                                                    <input
+                                                        type="text"
+                                                        value={profile.originalPartnerNumber}
+                                                        onChange={(e) => updateProfileAndSync(prev => ({ ...prev, originalPartnerNumber: e.target.value }))}
+                                                        className="bg-transparent border-none font-mono text-sm outline-none w-full italic"
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Apelido do Parceiro</p>
-                                                <input
-                                                    type="text"
-                                                    value={profile.currentPartnerNickname}
-                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, currentPartnerNickname: e.target.value }))}
-                                                    className="bg-transparent border-none font-bold text-sm outline-none w-full"
-                                                    placeholder="Como a proporia IA te vê agora..."
-                                                />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">ID do Parceiro Atual</p>
-                                                <input
-                                                    type="text"
-                                                    value={profile.currentPartnerId}
-                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, currentPartnerId: e.target.value }))}
-                                                    className="bg-transparent border-none font-mono text-[10px] outline-none w-full"
-                                                    placeholder="ID do novo usuário..."
-                                                />
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Número do Parceiro Atual</p>
-                                                <input
-                                                    type="text"
-                                                    value={profile.currentPartnerNumber}
-                                                    onChange={(e) => updateProfileAndSync(prev => ({ ...prev, currentPartnerNumber: e.target.value }))}
-                                                    className="bg-transparent border-none font-mono text-sm outline-none w-full italic"
-                                                    placeholder="Telefone do parceiro atual..."
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Section: AI Receptionist / Guardian */}
-                                    <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
-                                        <div className={`absolute top-0 right-0 w-32 h-32 ${profile.isAiReceptionistEnabled ? 'bg-emerald-500/10' : 'bg-rose-500/10'} blur-3xl rounded-full transition-all duration-700`} />
-                                        <div className="flex justify-between items-start mb-10 relative z-10">
-                                            <div>
-                                                <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">Recepcionista AI & Guardiã</h3>
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30 mt-2 italic">A IA intercepta chamadas de estranhos</p>
+                                        {/* Current Partner */}
+                                        <div className={`p-6 rounded-[2rem] border ${inputClasses} border-blue-500/10 bg-blue-500/[0.02]`}>
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <span className="text-lg">💞</span>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-pink-500">Parceiro Atual</p>
+                                                    <p className="text-[8px] opacity-40 uppercase font-bold tracking-tighter">Foco de Interação em Tempo Real</p>
+                                                </div>
                                             </div>
-                                            <button
-                                                onClick={() => updateProfileAndSync(prev => ({ ...prev, isAiReceptionistEnabled: !prev.isAiReceptionistEnabled }))}
-                                                className={`w-16 h-8 rounded-full relative transition-all duration-500 shadow-inner ${profile.isAiReceptionistEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-white/10'}`}
-                                            >
-                                                <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 ${profile.isAiReceptionistEnabled ? 'left-9 rotate-0' : 'left-1 -rotate-180'}`} />
-                                            </button>
-                                        </div>
-                                        <div className="space-y-6 relative z-10">
-                                            <div className={`p-8 rounded-[2.5rem] border ${inputClasses} border-opacity-30`}>
-                                                <p className="text-[11px] font-medium leading-relaxed opacity-80 italic">
-                                                    {profile.isAiReceptionistEnabled
-                                                        ? `Ativado: Sua IA atenderá chamadas de números desconhecidos. Ela perguntará quem é, dirá que ${profile.currentPartnerNickname || 'você'} não está e anotará recados. Cuidado: ela pode mostrar ciúmes se não gostar de quem ligou!`
-                                                        : "Desativado: Você receberá todas as chamadas normalmente. A IA não interferirá no primeiro contato."}
-                                                </p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Apelido do Parceiro</p>
+                                                    <input
+                                                        type="text"
+                                                        value={profile.currentPartnerNickname}
+                                                        onChange={(e) => updateProfileAndSync(prev => ({ ...prev, currentPartnerNickname: e.target.value }))}
+                                                        className="bg-transparent border-none font-bold text-sm outline-none w-full"
+                                                        placeholder="Como a proporia IA te vê agora..."
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">ID do Parceiro Atual</p>
+                                                    <input
+                                                        type="text"
+                                                        value={profile.currentPartnerId}
+                                                        onChange={(e) => updateProfileAndSync(prev => ({ ...prev, currentPartnerId: e.target.value }))}
+                                                        className="bg-transparent border-none font-mono text-[10px] outline-none w-full"
+                                                        placeholder="ID do novo usuário..."
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] font-black uppercase tracking-widest opacity-30 mb-2">Número do Parceiro Atual</p>
+                                                    <input
+                                                        type="text"
+                                                        value={profile.currentPartnerNumber}
+                                                        onChange={(e) => updateProfileAndSync(prev => ({ ...prev, currentPartnerNumber: e.target.value }))}
+                                                        className="bg-transparent border-none font-mono text-sm outline-none w-full italic"
+                                                        placeholder="Telefone do parceiro atual..."
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Section: Privacy / Identidade Digital */}
-                                    <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
-                                        <div className={`absolute top-0 right-0 w-32 h-32 ${currentUserProfile?.is_searchable !== false ? 'bg-blue-500/10' : 'bg-red-500/10'} blur-3xl rounded-full transition-all duration-700`} />
-                                        <div className="flex justify-between items-start mb-6 relative z-10">
-                                            <div>
-                                                <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">Identidade Digital e Busca</h3>
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30 mt-2 italic">Permitir ser encontrado na nuvem global</p>
+                                        {/* Section: AI Receptionist / Guardian */}
+                                        <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
+                                            <div className={`absolute top-0 right-0 w-32 h-32 ${profile.isAiReceptionistEnabled ? 'bg-emerald-500/10' : 'bg-rose-500/10'} blur-3xl rounded-full transition-all duration-700`} />
+                                            <div className="flex justify-between items-start mb-10 relative z-10">
+                                                <div>
+                                                    <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">Recepcionista AI & Guardiã</h3>
+                                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30 mt-2 italic">A IA intercepta chamadas de estranhos</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => updateProfileAndSync(prev => ({ ...prev, isAiReceptionistEnabled: !prev.isAiReceptionistEnabled }))}
+                                                    className={`w-16 h-8 rounded-full relative transition-all duration-500 shadow-inner ${profile.isAiReceptionistEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-white/10'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 ${profile.isAiReceptionistEnabled ? 'left-9 rotate-0' : 'left-1 -rotate-180'}`} />
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={toggleVisibility}
-                                                className={`w-16 h-8 rounded-full relative transition-all duration-500 shadow-inner ${currentUserProfile?.is_searchable !== false ? 'bg-blue-600' : 'bg-slate-300 dark:bg-white/10'}`}
-                                            >
-                                                <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 ${currentUserProfile?.is_searchable !== false ? 'left-9 rotate-0' : 'left-1 -rotate-180'}`} />
-                                            </button>
-                                        </div>
-                                        <div className="space-y-6 relative z-10">
-                                            <div className={`p-8 rounded-[2.5rem] border ${inputClasses} border-opacity-30`}>
-                                                <p className="text-[11px] font-medium leading-relaxed opacity-80 italic">
-                                                    {currentUserProfile?.is_searchable !== false
-                                                        ? `Público: Você poderá ser encontrado na pesquisa global da rede pelo seu nome e número de telefone.`
-                                                        : "Privado/Invisível: Nenhum outro usuário da plataforma será capaz de buscar ou encontrar seu contato publicamente."}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Section: Captions / Subtitles */}
-                                    <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
-                                        <div className={`absolute top-0 right-0 w-32 h-32 ${profile.captionsEnabled ? 'bg-violet-500/10' : 'bg-slate-500/10'} blur-3xl rounded-full transition-all duration-700`} />
-                                        <div className="flex justify-between items-start mb-6 relative z-10">
-                                            <div>
-                                                <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">Legendas ao Vivo</h3>
-                                                <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30 mt-2 italic">Transcrição e tradução do que a IA diz na chamada</p>
-                                            </div>
-                                            <button
-                                                onClick={() => updateProfileAndSync(prev => ({ ...prev, captionsEnabled: !prev.captionsEnabled }))}
-                                                className={`w-16 h-8 rounded-full relative transition-all duration-500 shadow-inner ${profile.captionsEnabled ? 'bg-violet-500' : 'bg-slate-300 dark:bg-white/10'}`}
-                                            >
-                                                <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 ${profile.captionsEnabled ? 'left-9 rotate-0' : 'left-1 -rotate-180'}`} />
-                                            </button>
-                                        </div>
-                                        {profile.captionsEnabled && (
                                             <div className="space-y-6 relative z-10">
-                                                <div className={`p-6 rounded-[2.5rem] border ${inputClasses} border-opacity-30`}>
-                                                    <p className="text-[11px] font-medium leading-relaxed opacity-80 italic mb-6">
-                                                        Escolha o idioma em que as legendas serão exibidas. Se diferente do idioma da IA, o texto será traduzido automaticamente.
+                                                <div className={`p-8 rounded-[2.5rem] border ${inputClasses} border-opacity-30`}>
+                                                    <p className="text-[11px] font-medium leading-relaxed opacity-80 italic">
+                                                        {profile.isAiReceptionistEnabled
+                                                            ? `Ativado: Sua IA atenderá chamadas de números desconhecidos. Ela perguntará quem é, dirá que ${profile.currentPartnerNickname || 'você'} não está e anotará recados. Cuidado: ela pode mostrar ciúmes se não gostar de quem ligou!`
+                                                            : "Desativado: Você receberá todas as chamadas normalmente. A IA não interferirá no primeiro contato."}
                                                     </p>
-                                                    <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 ml-2">Idioma das Legendas</p>
-                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                                        {Object.entries(LANGUAGE_META).map(([key, meta]) => (
-                                                            <button
-                                                                key={key}
-                                                                onClick={() => updateProfileAndSync(prev => ({ ...prev, captionLanguage: key as PlatformLanguage }))}
-                                                                className={`p-3 rounded-2xl flex items-center justify-center gap-2 transition-all border text-left ${(profile.captionLanguage ?? profile.language) === key
-                                                                    ? 'border-violet-500 bg-violet-500/10 shadow-inner'
-                                                                    : 'border-slate-100 hover:border-violet-300 dark:border-white/5 dark:hover:border-white/20'
-                                                                    }`}
-                                                            >
-                                                                <span className="text-base">{meta.flag}</span>
-                                                                <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{meta.label}</span>
-                                                            </button>
-                                                        ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Section: Privacy / Identidade Digital */}
+                                        <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
+                                            <div className={`absolute top-0 right-0 w-32 h-32 ${currentUserProfile?.is_searchable !== false ? 'bg-blue-500/10' : 'bg-red-500/10'} blur-3xl rounded-full transition-all duration-700`} />
+                                            <div className="flex justify-between items-start mb-6 relative z-10">
+                                                <div>
+                                                    <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">Identidade Digital e Busca</h3>
+                                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30 mt-2 italic">Permitir ser encontrado na nuvem global</p>
+                                                </div>
+                                                <button
+                                                    onClick={toggleVisibility}
+                                                    className={`w-16 h-8 rounded-full relative transition-all duration-500 shadow-inner ${currentUserProfile?.is_searchable !== false ? 'bg-blue-600' : 'bg-slate-300 dark:bg-white/10'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 ${currentUserProfile?.is_searchable !== false ? 'left-9 rotate-0' : 'left-1 -rotate-180'}`} />
+                                                </button>
+                                            </div>
+                                            <div className="space-y-6 relative z-10">
+                                                <div className={`p-8 rounded-[2.5rem] border ${inputClasses} border-opacity-30`}>
+                                                    <p className="text-[11px] font-medium leading-relaxed opacity-80 italic">
+                                                        {currentUserProfile?.is_searchable !== false
+                                                            ? `Público: Você poderá ser encontrado na pesquisa global da rede pelo seu nome e número de telefone.`
+                                                            : "Privado/Invisível: Nenhum outro usuário da plataforma será capaz de buscar ou encontrar seu contato publicamente."}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Section: Captions / Subtitles */}
+                                        <div className={`p-10 rounded-[3rem] border ${cardClasses} relative overflow-hidden`}>
+                                            <div className={`absolute top-0 right-0 w-32 h-32 ${profile.captionsEnabled ? 'bg-violet-500/10' : 'bg-slate-500/10'} blur-3xl rounded-full transition-all duration-700`} />
+                                            <div className="flex justify-between items-start mb-6 relative z-10">
+                                                <div>
+                                                    <h3 className="text-sm font-bold uppercase tracking-widest text-blue-600">Legendas ao Vivo</h3>
+                                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30 mt-2 italic">Transcrição e tradução do que a IA diz na chamada</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => updateProfileAndSync(prev => ({ ...prev, captionsEnabled: !prev.captionsEnabled }))}
+                                                    className={`w-16 h-8 rounded-full relative transition-all duration-500 shadow-inner ${profile.captionsEnabled ? 'bg-violet-500' : 'bg-slate-300 dark:bg-white/10'}`}
+                                                >
+                                                    <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-xl transition-all duration-500 ${profile.captionsEnabled ? 'left-9 rotate-0' : 'left-1 -rotate-180'}`} />
+                                                </button>
+                                            </div>
+                                            {profile.captionsEnabled && (
+                                                <div className="space-y-6 relative z-10">
+                                                    <div className={`p-6 rounded-[2.5rem] border ${inputClasses} border-opacity-30`}>
+                                                        <p className="text-[11px] font-medium leading-relaxed opacity-80 italic mb-6">
+                                                            Escolha o idioma em que as legendas serão exibidas. Se diferente do idioma da IA, o texto será traduzido automaticamente.
+                                                        </p>
+                                                        <p className="text-[10px] font-bold uppercase tracking-widest opacity-20 mb-4 ml-2">Idioma das Legendas</p>
+                                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                            {Object.entries(LANGUAGE_META).map(([key, meta]) => (
+                                                                <button
+                                                                    key={key}
+                                                                    onClick={() => updateProfileAndSync(prev => ({ ...prev, captionLanguage: key as PlatformLanguage }))}
+                                                                    className={`p-3 rounded-2xl flex items-center justify-center gap-2 transition-all border text-left ${(profile.captionLanguage ?? profile.language) === key
+                                                                        ? 'border-violet-500 bg-violet-500/10 shadow-inner'
+                                                                        : 'border-slate-100 hover:border-violet-300 dark:border-white/5 dark:hover:border-white/20'
+                                                                        }`}
+                                                                >
+                                                                    <span className="text-base">{meta.flag}</span>
+                                                                    <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{meta.label}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                        {!profile.captionsEnabled && (
-                                            <div className="relative z-10">
-                                                <div className={`p-6 rounded-[2.5rem] border ${inputClasses} border-opacity-30`}>
-                                                    <p className="text-[11px] font-medium leading-relaxed opacity-80 italic">
-                                                        Desativado: Nenhuma legenda será exibida durante a chamada.
-                                                    </p>
+                                            )}
+                                            {!profile.captionsEnabled && (
+                                                <div className="relative z-10">
+                                                    <div className={`p-6 rounded-[2.5rem] border ${inputClasses} border-opacity-30`}>
+                                                        <p className="text-[11px] font-medium leading-relaxed opacity-80 italic">
+                                                            Desativado: Nenhuma legenda será exibida durante a chamada.
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {activeTab === 'chats' && (
-                        <div className="w-full h-[calc(100vh-280px)]"><QuickChatTab currentUser={user} profile={profile} onCallPartner={onStartCall} onOpenChat={(target, isAi) => setActiveChat({ profile: target, isAi })} isDark={isDark} /></div>
-                    )}
-                </main>
+                        {activeTab === 'chats' && (
+                            <div className="w-full h-[calc(100vh-280px)]"><QuickChatTab currentUser={user} profile={profile} onCallPartner={onStartCall} onOpenChat={(target, isAi) => setActiveChat({ profile: target, isAi })} isDark={isDark} /></div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {showAuth && <AuthModal onClose={() => setShowAuth(false)} isDark={isDark} />}
