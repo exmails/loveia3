@@ -19,6 +19,7 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [showAddSelector, setShowAddSelector] = useState(false);
+    const [lastMessages, setLastMessages] = useState<Record<string, { content: string, is_read: boolean, sender_id: string, is_to_ai?: boolean }>>({});
 
     const isLight = !isDark;
     const cardClasses = isDark ? "bg-[#15181e] border-white/5" : "bg-white border-slate-100 shadow-sm";
@@ -54,7 +55,35 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
             `)
             .eq('owner_id', currentUser.id);
 
-        if (data) setContacts(data);
+        if (data) {
+            setContacts(data);
+            // Fetch last messages for all contacts
+            data.forEach(async (c) => {
+                const { data: msgData } = await supabase
+                    .from('chat_messages')
+                    .select('content, is_read, sender_id')
+                    .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${c.target_id}),and(sender_id.eq.${c.target_id},receiver_id.eq.${currentUser.id})`)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (msgData) {
+                    setLastMessages(prev => ({ ...prev, [c.target_id]: msgData }));
+                }
+            });
+
+            // Also fetch for main AI
+            const { data: mainMsg } = await supabase
+                .from('chat_messages')
+                .select('content, is_read, sender_id, is_to_ai')
+                .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id})`)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+            if (mainMsg) {
+                setLastMessages(prev => ({ ...prev, [currentUser.id]: mainMsg }));
+            }
+        }
         setLoading(false);
     };
 
@@ -140,21 +169,35 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
                     </div>
 
                     <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-baseline mb-1">
-                            <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>
-                                {profile.name} <span className="text-emerald-500 text-[10px] ml-1">●</span>
-                            </h4>
+                        <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center gap-2">
+                                <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>
+                                    {profile.name}
+                                </h4>
+                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest ${getRelStatus(profile.relationshipScore).color} ${isDark ? 'bg-white' : 'bg-black'}`}>
+                                    {getRelStatus(profile.relationshipScore).label}
+                                </span>
+                            </div>
                             <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Agora</span>
                         </div>
-                        <p className={`text-[13px] font-medium opacity-60 line-clamp-1 mb-1 italic`}>
-                            "Sentindo sua falta. Que tal uma ligação rápida?" 🖤
+                        <p className={`text-[12px] font-bold opacity-40 line-clamp-1 mb-1 italic`}>
+                            "Sentindo sua falta. Que tal uma ligação rápida?"
                         </p>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-black uppercase tracking-widest opacity-30">Status:</span>
-                            <span className={`text-[9px] font-black uppercase tracking-widest ${getRelStatus(profile.relationshipScore).color}`}>
-                                {getRelStatus(profile.relationshipScore).label}
-                            </span>
-                        </div>
+
+                        {/* Highlights the last message as requested */}
+                        {lastMessages[currentUser?.id] && (
+                            <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all ${!lastMessages[currentUser.id].is_read && lastMessages[currentUser.id].is_to_ai === false
+                                    ? (isDark ? 'bg-blue-600/20 border-blue-500/50 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm')
+                                    : (isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-slate-50 border-slate-100 text-slate-400')
+                                }`}>
+                                {!lastMessages[currentUser.id].is_read && lastMessages[currentUser.id].is_to_ai === false && (
+                                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                )}
+                                <span className="text-[11px] font-bold truncate max-w-[200px]">
+                                    {lastMessages[currentUser.id].content}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -193,12 +236,22 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
                             </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-baseline mb-1">
-                                <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>Julia</h4>
+                            <div className="flex justify-between items-center mb-1">
+                                <div className="flex items-center gap-2">
+                                    <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>Julia</h4>
+                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest text-blue-500 ${isDark ? 'bg-white' : 'bg-black'}`}>
+                                        Esfriando
+                                    </span>
+                                </div>
                                 <span className="text-[10px] font-black uppercase tracking-widest opacity-20">20:35</span>
                             </div>
-                            <p className={`text-[13px] font-medium opacity-40 line-clamp-1 mb-1`}>Ei, por que desapareceu? O silêncio dói...</p>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-blue-500 opacity-60">Esfriando</span>
+                            <p className={`text-[12px] font-bold opacity-40 line-clamp-1 mb-1`}>Ei, por que desapareceu? O silêncio dói...</p>
+
+                            {/* Mock highlight for unread */}
+                            <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border ${isDark ? 'bg-blue-600/20 border-blue-500/50 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                <span className="text-[11px] font-bold">"Ainda pensando em você..."</span>
+                            </div>
                         </div>
                         <div className="w-2.5 h-2.5 rounded-full bg-blue-600/20 ml-2" />
                     </div>
@@ -217,12 +270,20 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
                             </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-baseline mb-1">
-                                <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>Mariana</h4>
+                            <div className="flex justify-between items-center mb-1">
+                                <div className="flex items-center gap-2">
+                                    <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>Mariana</h4>
+                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest text-emerald-500 ${isDark ? 'bg-white' : 'bg-black'}`}>
+                                        Estável
+                                    </span>
+                                </div>
                                 <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Hoje</span>
                             </div>
-                            <p className={`text-[13px] font-medium opacity-40 line-clamp-1 mb-1`}>Preciso do seu conselho para uma coisa.</p>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80">Rel. estável</span>
+                            <p className={`text-[12px] font-bold opacity-40 line-clamp-1 mb-1`}>Preciso do seu conselho para uma coisa.</p>
+
+                            <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                                <span className="text-[11px] font-bold">"Obrigada pela ajuda ontem!"</span>
+                            </div>
                         </div>
                         <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-lg">2</div>
                     </div>
@@ -247,16 +308,36 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
                                 </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-baseline mb-1">
-                                    <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>
-                                        {contact.alias || (contact.is_ai_contact && contact.profile?.ai_settings?.name) || contact.profile?.display_name}
-                                    </h4>
+                                <div className="flex justify-between items-center mb-1">
+                                    <div className="flex items-center gap-2">
+                                        <h4 className={`font-black text-base italic tracking-tighter uppercase ${textMain}`}>
+                                            {contact.alias || (contact.is_ai_contact && contact.profile?.ai_settings?.name) || contact.profile?.display_name}
+                                        </h4>
+                                        {contact.is_ai_contact && (
+                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md bg-opacity-20 uppercase tracking-widest ${getRelStatus(contact.profile?.ai_settings?.relationshipScore || 100).color} ${isDark ? 'bg-white' : 'bg-black'}`}>
+                                                {getRelStatus(contact.profile?.ai_settings?.relationshipScore || 100).label}
+                                            </span>
+                                        )}
+                                    </div>
                                     <span className="text-[10px] font-black uppercase tracking-widest opacity-20">Fixado</span>
                                 </div>
-                                <p className={`text-[13px] font-medium opacity-30 line-clamp-1 mb-1 italic`}>
+                                <p className={`text-[12px] font-bold opacity-30 line-clamp-1 mb-1 italic`}>
                                     Toque para iniciar conexão...
                                 </p>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500/80">Pronta</span>
+
+                                {lastMessages[contact.target_id] && (
+                                    <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition-all ${!lastMessages[contact.target_id].is_read && lastMessages[contact.target_id].sender_id !== currentUser.id
+                                        ? (isDark ? 'bg-blue-600/20 border-blue-500/50 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm')
+                                        : (isDark ? 'bg-white/5 border-white/5 text-white/40' : 'bg-slate-50 border-slate-100 text-slate-400')
+                                        }`}>
+                                        {!lastMessages[contact.target_id].is_read && lastMessages[contact.target_id].sender_id !== currentUser.id && (
+                                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                        )}
+                                        <span className="text-[11px] font-bold truncate max-w-[200px]">
+                                            {lastMessages[contact.target_id].content}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
