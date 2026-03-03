@@ -43,7 +43,19 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
     const fileInputRef = useRef<HTMLInputElement>(null);
     const userFileInputRef = useRef<HTMLInputElement>(null);
     const historyInputRef = useRef<HTMLInputElement>(null);
-    const [activeChat, setActiveChat] = useState<{ profile: UserProfile, isAi: boolean } | null>(null);
+    const [activeChat, setActiveChatState] = useState<{ profile: UserProfile, isAi: boolean } | null>(() => {
+        const saved = sessionStorage.getItem('warm_activeChat');
+        return saved ? JSON.parse(saved) : null;
+    });
+
+    const setActiveChat = (chat: { profile: UserProfile, isAi: boolean } | null) => {
+        if (chat) {
+            sessionStorage.setItem('warm_activeChat', JSON.stringify(chat));
+        } else {
+            sessionStorage.removeItem('warm_activeChat');
+        }
+        setActiveChatState(chat);
+    };
 
     const isDark = profile.theme === 'dark';
     const isLight = !isDark;

@@ -121,6 +121,8 @@ export interface PartnerProfile {
   chat_model?: string;
   captionsEnabled?: boolean;
   captionLanguage?: PlatformLanguage;
+  dailyRefusalCount?: number;
+  lastRefusalDate?: string;
   callerInfo?: {
     id: string;
     name: string;

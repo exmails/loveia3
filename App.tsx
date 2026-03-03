@@ -141,7 +141,34 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // 2. Callback Scheduler Logic
+  // Helper to check for today's refusal quota
+  const isCallAllowedToday = () => {
+    const today = new Date().toISOString().split('T')[0];
+    if (profile.lastRefusalDate === today && (profile.dailyRefusalCount || 0) >= 3) {
+      return false;
+    }
+    return true;
+  };
+
+  // Helper to send a nudge message in chat instead of calling
+  const triggerAiChatMessage = async (reason: string) => {
+    if (!user) return;
+
+    let message = "Ei, tá por aí? Queria te contar uma fofoca... posso te ligar? 😉";
+    if (reason.startsWith('reminder:')) {
+      const reminderTitle = reason.split(':')[1];
+      message = `Oii! Lembrei de uma coisa: ${reminderTitle}. Quer falar sobre isso agora? Posso te ligar?`;
+    } else if (reason === 'curiosity_calendar') {
+      message = "Vi que você mudou umas coisas na agenda... fiquei curiosa! Pode falar rapidinho por voz?";
+    }
+
+    await supabase.from('chat_messages').insert({
+      sender_id: user.id, // In this flow, we'll use user.id to trigger it in the shared chat stream
+      receiver_id: user.id,
+      content: message,
+      is_to_ai: false
+    });
+  };
   useEffect(() => {
     if (appState === 'WAITING' || appState === 'SETUP') {
       const timer = setInterval(() => {
@@ -149,10 +176,18 @@ function App() {
 
         // Check specific scheduled call
         if (nextScheduledCall && now >= nextScheduledCall.triggerTime) {
-          setCallReason(nextScheduledCall.reason === 'random' ? 'random' : `reminder:${nextScheduledCall.reason}`);
-          setNextScheduledCall(null);
-          setActivePartner(profile); // Ensure partner is active for the call
-          setAppState('INCOMING');
+          const reason = nextScheduledCall.reason === 'random' ? 'random' : `reminder:${nextScheduledCall.reason}`;
+
+          if (sessionStorage.getItem('warm_activeTab') === 'chats') {
+            // If user is in chat, send a message instead of calling
+            triggerAiChatMessage(reason);
+            setNextScheduledCall(null);
+          } else {
+            setCallReason(reason);
+            setNextScheduledCall(null);
+            setActivePartner(profile);
+            setAppState('INCOMING');
+          }
           return;
         }
 
@@ -164,10 +199,14 @@ function App() {
           if (profile.intensity === CallbackIntensity.HIGH) threshold = 0.05; // 5% chance per second
           if (profile.intensity === CallbackIntensity.MEDIUM) threshold = 0.01;
 
-          if (randomChance < threshold) {
-            setCallReason('random');
-            setActivePartner(profile); // Ensure partner is active
-            setAppState('INCOMING');
+          if (randomChance < threshold && isCallAllowedToday()) {
+            if (sessionStorage.getItem('warm_activeTab') === 'chats') {
+              triggerAiChatMessage('random');
+            } else {
+              setCallReason('random');
+              setActivePartner(profile); // Ensure partner is active
+              setAppState('INCOMING');
+            }
           }
         }
       }, 1000);
@@ -182,8 +221,14 @@ function App() {
       if (lastLog && lastLog.notes.includes("Alterou o lembrete") && Date.now() - lastLog.timestamp < 10000) {
         // Trigger a "curious" call after 5-10 seconds
         const timer = setTimeout(() => {
-          setCallReason("curiosity_calendar");
-          setAppState('INCOMING');
+          if (isCallAllowedToday()) {
+            if (sessionStorage.getItem('warm_activeTab') === 'chats') {
+              triggerAiChatMessage("curiosity_calendar");
+            } else {
+              setCallReason("curiosity_calendar");
+              setAppState('INCOMING');
+            }
+          }
         }, 8000);
         return () => clearTimeout(timer);
       }
@@ -212,10 +257,16 @@ function App() {
         // Mark as completed immediately to prevent re-triggering
         await supabase.from('reminders').update({ is_completed: true }).eq('id', reminder.id);
 
-        console.log("Triggering database reminder:", reminder.title);
-        setCallReason(`reminder:${reminder.title}`);
-        setActivePartner(profile);
-        setAppState('INCOMING');
+        if (isCallAllowedToday()) {
+          console.log("Triggering database reminder:", reminder.title);
+          if (sessionStorage.getItem('warm_activeTab') === 'chats') {
+            triggerAiChatMessage(`reminder:${reminder.title}`);
+          } else {
+            setCallReason(`reminder:${reminder.title}`);
+            setActivePartner(profile);
+            setAppState('INCOMING');
+          }
+        }
       }
     };
 
@@ -300,7 +351,6 @@ function App() {
     let scoreChange = 10; // Normal call adds 10
     if (reason === 'hangup_abrupt') scoreChange = -15; // Hanging up hurts score
 
-    // 3. Handle Scheduling
     if (scheduled) {
       setNextScheduledCall(scheduled);
       setAppState('SETUP'); // Go to dashboard to show pending call
@@ -339,7 +389,31 @@ function App() {
     if (activeCallId) {
       await supabase.from('calls').update({ status: 'rejected' }).eq('id', activeCallId);
     }
-    setProfile(prev => ({ ...prev, relationshipScore: Math.max(0, prev.relationshipScore - 10) })); // Declining hurts score
+
+    // Update refusal count persistence
+    const today = new Date().toISOString().split('T')[0];
+    setProfile(prev => {
+      const isNewDay = prev.lastRefusalDate !== today;
+      const newCount = isNewDay ? 1 : (prev.dailyRefusalCount || 0) + 1;
+      const newScore = Math.max(0, prev.relationshipScore - 10);
+
+      const updatedProfile = {
+        ...prev,
+        relationshipScore: newScore,
+        dailyRefusalCount: newCount,
+        lastRefusalDate: today
+      };
+
+      // Sync back to DB if needed
+      if (user) {
+        supabase.from('profiles').update({
+          ai_settings: updatedProfile
+        }).eq('id', user.id).then();
+      }
+
+      return updatedProfile;
+    });
+
     setAppState('SETUP');
   };
 
@@ -499,6 +573,22 @@ function App() {
 
     // 3. Status/Relationship Score
     if (profile.relationshipScore < 20) return Math.random() > 0.5;
+
+    // 4. Outbound call logic (Adaptive: AI is harder to reach if the user is a refuser)
+    if (call.target_id === user.id && call.caller_id === user.id) {
+      // user calling own AI
+      let chanceOfDeclining = 0.25; // 25% baseline
+
+      // If user refused 2 or more times today, AI becomes "harder" (50% chance of declining)
+      if ((profile.dailyRefusalCount || 0) >= 2) {
+        chanceOfDeclining = 0.50;
+      }
+
+      if (Math.random() < chanceOfDeclining) {
+        console.log("AI decidiu não atender para fazer o usuário sentir falta.");
+        return false;
+      }
+    }
 
     return true; // Pick up by default
   };
