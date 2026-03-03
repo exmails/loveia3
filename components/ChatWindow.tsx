@@ -200,7 +200,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
             let userFriendlyError = error.message || "Tente novamente.";
 
             if (userFriendlyError.includes("exceeded your current quota") || userFriendlyError.includes("limit: 0")) {
-                userFriendlyError = "Limite do Google atingido (Quota Exceeded). DICA: Tente mudar o modelo para 'Gemini 1.5 Flash' nas configurações do Chat.";
+                userFriendlyError = `O modelo '${finalModel}' atingiu o limite de uso do Google (Quota Exceeded). DICA: Tente selecionar outro modelo (como o Gemini 1.5 Flash) nas configurações do Chat para continuar.`;
             } else if (userFriendlyError.includes("API key not valid")) {
                 userFriendlyError = "Chave API inválida. Verifique sua chave nas configurações.";
             }
