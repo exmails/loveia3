@@ -564,15 +564,15 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
                                         <div className="space-y-2">
                                             <label className="text-[10px] font-black uppercase tracking-widest opacity-30 ml-4">Modelo do Chat</label>
                                             <select
-                                                value={profile.chat_model || 'gemini-2.0-flash'}
+                                                value={profile.chat_model || 'gemini-3-flash-preview'}
                                                 onChange={(e) => updateProfileAndSync(prev => ({ ...prev, chat_model: e.target.value }))}
                                                 className={`w-full p-5 rounded-[2rem] text-sm font-bold border ${inputClasses} appearance-none cursor-pointer`}
                                             >
-                                                <option value="gemini-2.0-flash">Gemini 3 Flash (Fast & Efficient)</option>
-                                                <option value="gemini-2.0-pro-exp-02-05">Gemini 3.1 Pro (Advanced Reasoning)</option>
-                                                <option value="gemini-2.0-flash-exp">Gemini 2.5 Flash (Balanced)</option>
-                                                <option value="gemini-2.0-flash-lite-preview-02-05">Gemini Flash Lite (Lightweight)</option>
-                                                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Legacy Stable)</option>
+                                                <option value="gemini-3-flash-preview">Gemini 3 Flash (Fast & Efficient)</option>
+                                                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (Advanced Reasoning)</option>
+                                                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Balanced)</option>
+                                                <option value="gemini-2.5-flash-lite-latest">Gemini Flash Lite (Extremely Fast)</option>
+                                                <option value="gemini-1.5-flash-latest">Gemini 1.5 Flash (Legacy)</option>
                                                 <option value="gemini-1.5-pro-latest">Gemini 1.5 Pro (Legacy)</option>
                                             </select>
                                         </div>

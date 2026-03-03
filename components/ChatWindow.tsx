@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, ChatMessage, PartnerProfile } from '../types';
+import { UserProfile, ChatMessage } from '../types';
+import { GeminiService, ChatMessage as AiChatMessage } from './services/geminiService';
 
 interface ChatWindowProps {
     currentUser: any;
@@ -123,7 +124,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
 
     const handleAiResponse = async (userMsg: string, currentHistory: ChatMessage[]) => {
         const finalKey = (chatApiKey || apiKey || "").trim();
-        const finalModel = chatModel || 'gemini-2.0-flash';
+        const finalModel = chatModel || 'gemini-3-flash-preview';
 
         if (!finalKey) {
             setError("Chave API do Gemini não configurada.");
@@ -132,7 +133,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
 
         setIsAiTyping(true);
         try {
-            console.log(`Chamando Gemini (${finalModel}) via REST API...`);
+            console.log(`Chamando Gemini Service (${finalModel}) via SDK...`);
+
+            const service = new GeminiService({
+                model: finalModel,
+                apiKey: finalKey
+            });
 
             const systemInstruction = `Você é a IA de ${activeTarget.display_name}. 
                 Personalidade: ${activeTarget.ai_settings?.personality || 'Amigável'}.
@@ -140,72 +146,62 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                 Responda como se estivesse em um chat de texto (WhatsApp/Telegram). 
                 Seja natural, use emojis se combinar com a personalidade e seja breve.`;
 
-            const chatHistory = currentHistory.slice(-10).map(m => ({
+            const history: AiChatMessage[] = currentHistory.slice(-10).map(m => ({
                 role: m.sender_id === currentUser.id ? 'user' : 'model',
-                parts: [{ text: m.content }]
+                content: m.content
             }));
 
-            // Filter and merge consecutive roles (Gemini requires turn-taking)
-            const filteredHistory: any[] = [];
-            chatHistory.forEach((msg, idx) => {
-                if (idx === 0 || msg.role !== filteredHistory[filteredHistory.length - 1].role) {
-                    filteredHistory.push(msg);
-                } else {
-                    filteredHistory[filteredHistory.length - 1].parts[0].text += "\n" + msg.parts[0].text;
-                }
+            // Adiciona mensagem vazia da IA para o streaming
+            setMessages(prev => [...prev, {
+                id: 'typing-' + Date.now(),
+                sender_id: activeTarget.id,
+                receiver_id: currentUser.id,
+                content: '',
+                is_to_ai: false,
+                created_at: new Date().toISOString(),
+                is_read: true
+            }]);
+
+            const stream = service.sendMessageStream(userMsg, history, systemInstruction);
+            let assistantContent = '';
+
+            for await (const chunk of stream) {
+                assistantContent += chunk;
+                setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMsg = newMessages[newMessages.length - 1];
+                    if (lastMsg && lastMsg.id.startsWith('typing-')) {
+                        lastMsg.content = assistantContent;
+                    }
+                    return newMessages;
+                });
+            }
+
+            // Após terminar o streaming, salva a mensagem completa no Supabase
+            const { error: saveError } = await supabase.from('chat_messages').insert({
+                sender_id: activeTarget.id,
+                receiver_id: currentUser.id,
+                content: assistantContent,
+                is_to_ai: false,
+                is_read: false
             });
 
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${finalModel}:generateContent?key=${finalKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        system_instruction: {
-                            parts: [{ text: systemInstruction }]
-                        },
-                        contents: filteredHistory
-                    })
-                }
-            );
+            if (saveError) console.error("Error saving AI response:", saveError);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error?.message || `HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-            const aiResponseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (!aiResponseText) throw new Error("IA retornou resposta vazia.");
-
-            const { data: aiMsg, error: aiInsertError } = await supabase
-                .from('chat_messages')
-                .insert({
-                    sender_id: activeTarget.id,
-                    receiver_id: currentUser.id,
-                    content: aiResponseText,
-                    is_to_ai: true
-                })
-                .select()
-                .single();
-
-            if (aiInsertError) throw aiInsertError;
-
-            if (aiMsg) {
-                setMessages(prev => [...prev, aiMsg]);
-            }
         } catch (error: any) {
             console.error("AI Error:", error);
             let userFriendlyError = error.message || "Tente novamente.";
 
             if (userFriendlyError.includes("exceeded your current quota") || userFriendlyError.includes("limit: 0")) {
-                userFriendlyError = `O modelo '${finalModel}' atingiu o limite de uso do Google (Quota Exceeded). DICA: Tente selecionar outro modelo (como o Gemini 1.5 Flash) nas configurações do Chat para continuar.`;
+                userFriendlyError = `O modelo '${finalModel}' atingiu o limite de uso do Google (Quota Exceeded). DICA: Tente selecionar outro modelo nas configurações do Chat para continuar.`;
             } else if (userFriendlyError.includes("API key not valid")) {
                 userFriendlyError = "Chave API inválida. Verifique sua chave nas configurações.";
             }
 
             setError("Erro na IA: " + userFriendlyError);
+
+            // Remove a mensagem de typing em caso de erro
+            setMessages(prev => prev.filter(m => !m.id.startsWith('typing-')));
         } finally {
             setIsAiTyping(false);
         }
