@@ -70,19 +70,25 @@ export const ContactList: React.FC<ContactListProps> = ({ currentUser, onCallPar
             return;
         }
         setLoading(true);
+
+        // Normalize search: strip prefixes and spaces if searching by number
+        let normalizedQuery = searchQuery.trim();
+        if (normalizedQuery.toLowerCase().startsWith('ai-') || normalizedQuery.toLowerCase().startsWith('hu-')) {
+            normalizedQuery = normalizedQuery.substring(3);
+        }
+        normalizedQuery = normalizedQuery.replace(/\s/g, '');
+
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
-            .or(`personal_number.ilike.%${searchQuery}%,ai_number.ilike.%${searchQuery}%,nickname.ilike.%${searchQuery}%,display_name.ilike.%${searchQuery}%,ai_settings->>name.ilike.%${searchQuery}%`)
+            .or(`personal_number.ilike.%${normalizedQuery}%,ai_number.ilike.%${normalizedQuery}%,nickname.ilike.%${searchQuery}%,display_name.ilike.%${searchQuery}%,ai_settings->>name.ilike.%${searchQuery}%`)
             .eq('is_searchable', true)
             .limit(20);
 
         if (data) {
-            const contactIds = new Set(contacts.map(c => c.target_id));
             const myBlocked = myProfile?.blocked_users || [];
 
             const filteredResults = data.filter(p =>
-                !contactIds.has(p.id) &&
                 p.id !== currentUser.id &&
                 !(p.blocked_users || []).includes(currentUser.id) &&
                 !myBlocked.includes(p.id)
@@ -207,15 +213,23 @@ export const ContactList: React.FC<ContactListProps> = ({ currentUser, onCallPar
     };
 
     const filteredContacts = contacts.filter(contact => {
-        const query = searchQuery.toLowerCase();
+        const query = searchQuery.toLowerCase().trim();
+        let normalizedQuery = query;
+        if (normalizedQuery.startsWith('ai-') || normalizedQuery.startsWith('hu-')) {
+            normalizedQuery = normalizedQuery.substring(3);
+        }
+        normalizedQuery = normalizedQuery.replace(/\s/g, '');
+
+        if (!normalizedQuery) return true;
+
         return (
             contact.alias?.toLowerCase().includes(query) ||
             contact.contact_name?.toLowerCase().includes(query) ||
             contact.profile?.display_name?.toLowerCase().includes(query) ||
             contact.profile?.nickname?.toLowerCase().includes(query) ||
             contact.profile?.ai_settings?.name?.toLowerCase().includes(query) ||
-            contact.profile?.personal_number?.includes(query) ||
-            contact.profile?.ai_number?.includes(query)
+            (contact.profile?.personal_number && contact.profile.personal_number.replace(/\D/g, '').includes(normalizedQuery)) ||
+            (contact.profile?.ai_number && contact.profile.ai_number.replace(/\D/g, '').includes(normalizedQuery))
         );
     });
 
@@ -423,12 +437,17 @@ export const ContactList: React.FC<ContactListProps> = ({ currentUser, onCallPar
                                             ) : '👤'}
                                         </div>
                                         <div className="flex-1 text-center sm:text-left">
-                                            <h4 className="text-lg font-black italic tracking-tighter uppercase">
-                                                {result.nickname || result.display_name}
-                                                {result.ai_settings?.name && (
-                                                    <span className="text-[10px] font-black opacity-30 ml-2"> (AI: {result.ai_settings.name})</span>
+                                            <div className="flex items-center gap-2 justify-center sm:justify-start">
+                                                <h4 className="text-lg font-black italic tracking-tighter uppercase">
+                                                    {result.nickname || result.display_name}
+                                                </h4>
+                                                {contacts.some(c => c.target_id === result.id) && (
+                                                    <span className="text-[8px] font-black px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 uppercase tracking-widest border border-emerald-500/20">Nos Contatos</span>
                                                 )}
-                                            </h4>
+                                            </div>
+                                            {result.ai_settings?.name && (
+                                                <p className="text-[10px] font-bold opacity-40 uppercase tracking-widest mt-1 italic">I.A.: {result.ai_settings.name}</p>
+                                            )}
                                             <div className="flex flex-wrap justify-center sm:justify-start gap-4 mt-1">
                                                 <div className="flex items-center gap-1.5 opacity-40">
                                                     <span className="text-[9px] font-black uppercase tracking-widest text-blue-500">Hu</span>
@@ -453,9 +472,10 @@ export const ContactList: React.FC<ContactListProps> = ({ currentUser, onCallPar
                                                 </button>
                                                 <button
                                                     onClick={() => addContact(result, false)}
-                                                    className="px-4 py-2 bg-blue-600/10 text-blue-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all whitespace-nowrap"
+                                                    disabled={contacts.some(c => c.target_id === result.id && !c.is_ai_contact)}
+                                                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${contacts.some(c => c.target_id === result.id && !c.is_ai_contact) ? 'bg-slate-500/10 text-slate-400 cursor-not-allowed opacity-50' : 'bg-blue-600/10 text-blue-600 hover:bg-blue-600 hover:text-white'}`}
                                                 >
-                                                    + Humano
+                                                    {contacts.some(c => c.target_id === result.id && !c.is_ai_contact) ? 'Salvo' : '+ Humano'}
                                                 </button>
                                                 <button
                                                     onClick={() => handleCallDirect(result, false)}
@@ -476,9 +496,10 @@ export const ContactList: React.FC<ContactListProps> = ({ currentUser, onCallPar
                                                 </button>
                                                 <button
                                                     onClick={() => addContact(result, true)}
-                                                    className="px-4 py-2 bg-pink-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-pink-700 shadow-lg shadow-pink-600/20 transition-all whitespace-nowrap"
+                                                    disabled={contacts.some(c => c.target_id === result.id && c.is_ai_contact)}
+                                                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${contacts.some(c => c.target_id === result.id && c.is_ai_contact) ? 'bg-slate-500/10 text-slate-400 cursor-not-allowed opacity-50' : 'bg-pink-600 text-white hover:bg-pink-700 shadow-lg shadow-pink-600/20'}`}
                                                 >
-                                                    + AI
+                                                    {contacts.some(c => c.target_id === result.id && c.is_ai_contact) ? 'Salvo' : '+ AI'}
                                                 </button>
                                                 <button
                                                     onClick={() => handleCallDirect(result, true)}
