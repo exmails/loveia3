@@ -125,7 +125,7 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
 
                 {/* Main AI Partner (Priority) */}
                 <div
-                    onClick={() => onCallPartner(profile)}
+                    onClick={() => onOpenChat(currentUserProfileStub, true)}
                     className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} border-b last:border-0 group`}
                 >
                     <div className="relative flex-shrink-0">
@@ -180,7 +180,10 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
                 {/* Sub-List (Pinned and Recents) */}
                 <div className="divide-y divide-inherit">
                     {/* Mock Julia */}
-                    <div className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}>
+                    <div
+                        onClick={() => {/* Mock interaction */ }}
+                        className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}
+                    >
                         <div className="relative flex-shrink-0">
                             <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-md group-hover:scale-105 transition-transform duration-500">
                                 <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop" className="w-full h-full object-cover grayscale-[0.2]" />
@@ -201,7 +204,10 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
                     </div>
 
                     {/* Mock Mariana */}
-                    <div className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}>
+                    <div
+                        onClick={() => {/* Mock interaction */ }}
+                        className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}
+                    >
                         <div className="relative flex-shrink-0">
                             <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden shadow-md group-hover:scale-105 transition-transform duration-500">
                                 <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop" className="w-full h-full object-cover" />
@@ -225,7 +231,7 @@ export const QuickChatTab: React.FC<QuickChatTabProps> = ({ currentUser, profile
                     {pinnedList.map((contact) => (
                         <div
                             key={contact.id}
-                            onClick={() => handleCallContact(contact)}
+                            onClick={() => { if (contact.profile) onOpenChat(contact.profile, contact.is_ai_contact); }}
                             className={`flex items-center gap-5 p-6 cursor-pointer relative ${itemClasses} group`}
                         >
                             <div className="relative flex-shrink-0">
