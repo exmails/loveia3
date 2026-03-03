@@ -12,11 +12,22 @@ interface ChatWindowProps {
     apiKey: string;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfile, isAi, onClose, isDark, apiKey }) => {
+interface Conversation {
+    profile: UserProfile;
+    isAi: boolean;
+    lastMessage?: string;
+    lastMessageDate?: string;
+}
+
+export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfile: initialTarget, isAi: initialIsAi, onClose, isDark, apiKey }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [activeTarget, setActiveTarget] = useState<UserProfile>(initialTarget);
+    const [activeIsAi, setActiveIsAi] = useState(initialIsAi);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [isAiTyping, setIsAiTyping] = useState(false);
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [loadingConversations, setLoadingConversations] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const cardClasses = isDark ? "bg-[#15181e] border-white/5 text-white" : "bg-white border-slate-100 text-slate-900";
@@ -25,7 +36,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
     useEffect(() => {
         fetchMessages();
         const subscription = supabase
-            .channel('chat_messages')
+            .channel(`chat_${activeTarget.id}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -33,14 +44,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                 filter: `receiver_id=eq.${currentUser.id}`
             }, (payload) => {
                 const newMsg = payload.new as ChatMessage;
-                if (newMsg.sender_id === targetProfile.id) {
+                if (newMsg.sender_id === activeTarget.id) {
                     setMessages(prev => [...prev, newMsg]);
                 }
             })
             .subscribe();
 
         return () => { subscription.unsubscribe(); };
-    }, [targetProfile.id]);
+    }, [activeTarget.id]);
+
+    useEffect(() => {
+        fetchConversations();
+    }, []);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -53,11 +68,59 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
         const { data, error } = await supabase
             .from('chat_messages')
             .select('*')
-            .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${targetProfile.id}),and(sender_id.eq.${targetProfile.id},receiver_id.eq.${currentUser.id})`)
+            .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeTarget.id}),and(sender_id.eq.${activeTarget.id},receiver_id.eq.${currentUser.id})`)
             .order('created_at', { ascending: true });
 
         if (data) setMessages(data);
         setLoading(false);
+    };
+
+    const fetchConversations = async () => {
+        setLoadingConversations(true);
+        try {
+            // Get all unique chat partners
+            const { data: sentData } = await supabase
+                .from('chat_messages')
+                .select('receiver_id, is_to_ai')
+                .eq('sender_id', currentUser.id);
+
+            const { data: receivedData } = await supabase
+                .from('chat_messages')
+                .select('sender_id, is_to_ai')
+                .eq('receiver_id', currentUser.id);
+
+            const partners = new Map<string, boolean>();
+            sentData?.forEach(m => partners.set(m.receiver_id, !!m.is_to_ai));
+            receivedData?.forEach(m => partners.set(m.sender_id, !!m.is_to_ai));
+
+            const partnerIds = Array.from(partners.keys());
+            if (partnerIds.length > 0) {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .in('id', partnerIds);
+
+                if (profiles) {
+                    const convs: Conversation[] = profiles.map(p => ({
+                        profile: p,
+                        isAi: partners.get(p.id) || false
+                    }));
+
+                    // Add initial target if not in list
+                    if (!convs.find(c => c.profile.id === initialTarget.id)) {
+                        convs.unshift({ profile: initialTarget, isAi: initialIsAi });
+                    }
+
+                    setConversations(convs);
+                }
+            } else {
+                setConversations([{ profile: initialTarget, isAi: initialIsAi }]);
+            }
+        } catch (err) {
+            console.error("Error fetching conversations:", err);
+        } finally {
+            setLoadingConversations(false);
+        }
     };
 
     const handleSendMessage = async (e: React.FormEvent) => {
@@ -71,9 +134,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
             .from('chat_messages')
             .insert({
                 sender_id: currentUser.id,
-                receiver_id: targetProfile.id,
+                receiver_id: activeTarget.id,
                 content: msgContent,
-                is_to_ai: isAi
+                is_to_ai: activeIsAi
             })
             .select()
             .single();
@@ -81,7 +144,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
         if (sentMsg) {
             setMessages(prev => [...prev, sentMsg]);
 
-            if (isAi) {
+            if (activeIsAi) {
                 handleAiResponse(msgContent);
             }
         }
@@ -93,9 +156,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
             const genAI = new GoogleGenAI(apiKey);
             const model = genAI.getGenerativeModel({
                 model: "gemini-2.0-flash",
-                systemInstruction: `Você é a IA de ${targetProfile.display_name}. 
-                Nome da IA: ${targetProfile.ai_settings?.name || 'IA'}.
-                Personalidade: ${targetProfile.ai_settings?.personality || 'Amigável e prestativa'}.
+                systemInstruction: `Você é a IA de ${activeTarget.display_name}. 
+                Nome da IA: ${activeTarget.ai_settings?.name || 'IA'}.
+                Personalidade: ${activeTarget.ai_settings?.personality || 'Amigável e prestativa'}.
                 Responda como se estivesse em um chat de texto (WhatsApp/Telegram). 
                 Seja natural, use emojis se combinar com a personalidade e seja breve.`
             });
@@ -114,7 +177,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
             const { data: aiMsg } = await supabase
                 .from('chat_messages')
                 .insert({
-                    sender_id: targetProfile.id,
+                    sender_id: activeTarget.id,
                     receiver_id: currentUser.id,
                     content: aiResponseText,
                     is_to_ai: true
@@ -133,40 +196,74 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
     };
 
     return (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xl animate-in fade-in duration-300">
-            <div className={`w-full max-w-2xl h-[85vh] flex flex-col rounded-[3rem] border shadow-2xl overflow-hidden ${cardClasses} animate-in slide-in-from-bottom-12 duration-700`}>
+        <div className="fixed inset-0 z-[300] bg-black backdrop-blur-3xl animate-in fade-in duration-300 flex flex-col sm:flex-row">
 
+            {/* Sidebar */}
+            <div className={`w-full sm:w-80 h-16 sm:h-full border-b sm:border-b-0 sm:border-r border-white/5 flex flex-col ${cardClasses} z-10 relative shadow-2xl overflow-hidden`}>
+                <div className="p-6 border-b border-inherit bg-black/5 flex items-center justify-between">
+                    <h2 className="text-xl font-black italic tracking-tighter uppercase">Chats</h2>
+                    <button onClick={onClose} className="sm:hidden w-8 h-8 flex items-center justify-center rounded-full bg-white/5 opacity-50">✕</button>
+                    <button onClick={onClose} className="hidden sm:flex text-[10px] font-black uppercase tracking-widest opacity-30 hover:opacity-100 transition-opacity">Fechar</button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto no-scrollbar flex sm:flex-col p-2 sm:p-4 gap-2">
+                    {conversations.map((conv) => (
+                        <div
+                            key={conv.profile.id}
+                            onClick={() => { setActiveTarget(conv.profile); setActiveIsAi(conv.isAi); }}
+                            className={`flex items-center gap-4 p-4 rounded-[1.5rem] cursor-pointer transition-all shrink-0 sm:shrink ${activeTarget.id === conv.profile.id
+                                    ? (isDark ? 'bg-blue-600 shadow-xl shadow-blue-600/20 text-white' : 'bg-blue-600 text-white shadow-lg')
+                                    : (isDark ? 'hover:bg-white/5 text-white/60' : 'hover:bg-slate-50 text-slate-800')
+                                }`}
+                        >
+                            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md shrink-0">
+                                {conv.isAi ? (
+                                    conv.profile.ai_settings?.image ? <img src={conv.profile.ai_settings.image} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-pink-500/10 flex items-center justify-center">⚡</div>
+                                ) : (
+                                    conv.profile.avatar_url ? <img src={conv.profile.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-blue-500/10 flex items-center justify-center text-xs">👤</div>
+                                )}
+                            </div>
+                            <div className="hidden sm:block flex-1 min-w-0">
+                                <p className="font-bold text-[14px] italic uppercase tracking-tighter truncate">{conv.isAi ? (conv.profile.ai_settings?.name || conv.profile.display_name) : conv.profile.display_name}</p>
+                                <p className="text-[9px] font-black uppercase tracking-widest opacity-40">{conv.isAi ? 'IA Partner' : 'Conexão Humana'}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Main Chat Area */}
+            <div className={`flex-1 flex flex-col h-full relative overflow-hidden ${isDark ? 'bg-[#0f1116]' : 'bg-slate-50'}`}>
                 {/* Header */}
-                <div className="p-6 border-b border-inherit flex items-center justify-between bg-black/5 dark:bg-white/5">
+                <div className={`p-6 border-b border-white/5 flex items-center justify-between ${cardClasses} z-10`}>
                     <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-2xl overflow-hidden shadow-lg ${isAi ? 'ring-2 ring-pink-500/50' : 'ring-2 ring-blue-500/50'}`}>
-                            {isAi ? (
-                                targetProfile.ai_settings?.image ? <img src={targetProfile.ai_settings.image} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-pink-500/10 flex items-center justify-center">⚡</div>
+                        <div className={`w-12 h-12 rounded-2xl overflow-hidden shadow-lg ${activeIsAi ? 'ring-2 ring-pink-500/50' : 'ring-2 ring-blue-500/50'}`}>
+                            {activeIsAi ? (
+                                activeTarget.ai_settings?.image ? <img src={activeTarget.ai_settings.image} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-pink-500/10 flex items-center justify-center">⚡</div>
                             ) : (
-                                targetProfile.avatar_url ? <img src={targetProfile.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-blue-500/10 flex items-center justify-center">👤</div>
+                                activeTarget.avatar_url ? <img src={activeTarget.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-blue-500/10 flex items-center justify-center">👤</div>
                             )}
                         </div>
                         <div>
                             <h3 className="font-black italic uppercase tracking-tighter text-lg">
-                                {isAi ? (targetProfile.ai_settings?.name || `IA de ${targetProfile.display_name}`) : targetProfile.display_name}
+                                {activeIsAi ? (activeTarget.ai_settings?.name || `IA de ${activeTarget.display_name}`) : activeTarget.display_name}
                             </h3>
                             <div className="flex items-center gap-1.5 pt-0.5">
                                 <div className={`w-2 h-2 rounded-full ${isAiTyping ? 'bg-pink-500 animate-pulse' : 'bg-emerald-500'}`} />
                                 <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">
-                                    {isAiTyping ? 'Digitando...' : (isAi ? 'IA Online' : 'Online')}
+                                    {isAiTyping ? 'Digitando...' : (activeIsAi ? 'IA Online' : 'Online')}
                                 </span>
                             </div>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-10 h-10 flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-all text-xl opacity-30 hover:opacity-100">✕</button>
                 </div>
 
                 {/* Messages Area */}
-                <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar bg-slate-50/50 dark:bg-black/20">
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
                     {loading ? (
                         <div className="h-full flex flex-col items-center justify-center opacity-30 gap-3">
                             <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em]">Criptografando Mensagens...</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em]">Sincronizando Mensagens...</p>
                         </div>
                     ) : messages.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center opacity-20 italic gap-4">
@@ -178,12 +275,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                             const isMe = msg.sender_id === currentUser.id;
                             return (
                                 <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                                    <div className={`max-w-[80%] p-4 rounded-3xl ${isMe
-                                            ? 'bg-blue-600 text-white rounded-tr-none shadow-xl shadow-blue-500/20'
-                                            : (isDark ? 'bg-white/10 text-white' : 'bg-white shadow-md text-slate-800') + ' rounded-tl-none'
+                                    <div className={`max-w-[75%] p-5 rounded-3xl ${isMe
+                                        ? 'bg-blue-600 text-white rounded-tr-none shadow-2xl shadow-blue-500/20'
+                                        : (isDark ? 'bg-white/10 text-white shadow-xl' : 'bg-white shadow-md text-slate-800') + ' rounded-tl-none'
                                         }`}>
-                                        <p className="text-sm font-medium leading-relaxed">{msg.content}</p>
-                                        <div className={`text-[8px] mt-1 font-bold uppercase tracking-widest opacity-40 ${isMe ? 'text-right' : 'text-left'}`}>
+                                        <p className="text-[15px] font-medium leading-relaxed">{msg.content}</p>
+                                        <div className={`text-[9px] mt-2 font-black uppercase tracking-widest opacity-40 ${isMe ? 'text-right' : 'text-left'}`}>
                                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </div>
                                     </div>
@@ -193,8 +290,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                     )}
                     {isAiTyping && (
                         <div className="flex justify-start animate-in fade-in duration-300">
-                            <div className={`p-4 rounded-3xl rounded-tl-none ${isDark ? 'bg-white/10 text-white' : 'bg-white shadow-md text-slate-800'}`}>
-                                <div className="flex gap-1">
+                            <div className={`p-5 rounded-3xl rounded-tl-none ${isDark ? 'bg-white/10 text-white shadow-xl' : 'bg-white shadow-md text-slate-800'}`}>
+                                <div className="flex gap-1.5 py-1">
                                     <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                                     <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                                     <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -205,26 +302,26 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                 </div>
 
                 {/* Input Area */}
-                <form onSubmit={handleSendMessage} className="p-6 border-t border-inherit bg-black/5 dark:bg-white/5">
-                    <div className="flex gap-3">
+                <div className="p-6 sm:p-10 border-t border-white/5 bg-black/5">
+                    <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto flex gap-4">
                         <input
                             type="text"
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             placeholder="ESCREVER MENSAGEM..."
-                            className={`flex-1 p-4 rounded-2xl border text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all ${inputClasses}`}
+                            className={`flex-1 p-6 rounded-[2rem] border text-sm font-bold focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all ${inputClasses} shadow-inner`}
                         />
                         <button
                             type="submit"
                             disabled={!newMessage.trim() || isAiTyping}
-                            className="w-14 h-14 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+                            className="w-20 h-20 bg-blue-600 text-white rounded-[2.5rem] shadow-[0_20px_40px_-10px_rgba(37,99,235,0.4)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transform rotate-90" viewBox="0 0 24 24" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 transform rotate-90" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                             </svg>
                         </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     );
