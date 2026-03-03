@@ -259,11 +259,11 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
     return (
         <div className={`min-h-screen ${themeClasses} transition-colors duration-700 flex font-sans tracking-tight overflow-x-hidden`}>
 
-            {/* Sidebar - Vertical Navigation (Desktop) */}
+            {/* Sidebar - Vertical Navigation (Permanent) */}
             <aside
                 onMouseEnter={() => setIsSidebarExpanded(true)}
                 onMouseLeave={() => setIsSidebarExpanded(false)}
-                className={`fixed left-0 top-0 h-full z-[70] transition-all duration-500 ease-in-out border-r shadow-2xl hidden md:flex ${isSidebarExpanded ? 'w-64' : 'w-20'} ${isLight ? 'bg-white/95 border-slate-100' : 'bg-[#0b0c10]/95 border-white/5'} backdrop-blur-2xl flex-col py-8`}
+                className={`fixed left-0 top-0 h-full z-[70] transition-all duration-500 ease-in-out border-r shadow-2xl flex flex-col py-8 ${isSidebarExpanded ? 'w-56 md:w-64' : 'w-16 md:w-20'} ${isLight ? 'bg-white/95 border-slate-100' : 'bg-[#0b0c10]/95 border-white/5'} backdrop-blur-2xl`}
             >
                 {/* Logo Section in Sidebar */}
                 <div className={`mb-12 flex items-center gap-3 px-5 transition-all duration-500 ${isSidebarExpanded ? 'justify-start' : 'justify-center'}`}>
@@ -325,46 +325,11 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ profile, setProfile, o
             </aside>
 
             {/* Main Content Area */}
-            <div className={`flex-1 flex flex-col transition-all duration-500 ${isSidebarExpanded ? 'md:ml-64' : 'md:ml-20'}`}>
+            <div className={`flex-1 flex flex-col transition-all duration-500 ${isSidebarExpanded ? 'ml-56 md:ml-64' : 'ml-16 md:ml-20'}`}>
 
-                {/* Mobile Header (Hidden on Desktop) */}
-                <header className={`md:hidden w-full sticky top-0 z-[60] px-4 py-3 flex justify-between items-center ${isLight ? 'bg-white/80' : 'bg-[#0b0c10]/80'} backdrop-blur-xl border-b ${borderClass}`}>
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-sm shadow-lg shadow-blue-500/20">⚡</div>
-                        <h1 className="text-sm font-black tracking-tighter uppercase italic">WARM <span className="text-blue-600">CONN</span></h1>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => updateProfileAndSync(prev => ({ ...prev, theme: isDark ? 'light' : 'dark' }))} className="w-8 h-8 rounded-full flex items-center justify-center border border-white/10 dark:bg-white/5">
-                            {isDark ? '☀️' : '🌙'}
-                        </button>
-                    </div>
-                </header>
 
-                {/* Mobile Top Navigation (Hidden on Desktop) */}
-                <nav className="md:hidden w-full sticky top-14 z-50 p-2 overflow-x-auto no-scrollbar bg-inherit border-b border-white/5">
-                    <div className="flex gap-2 min-w-max px-2">
-                        {[
-                            { id: 'dashboard', label: 'Início', icon: '🏠' },
-                            { id: 'chats', label: 'Chats', icon: '💬' },
-                            { id: 'contacts', label: 'Contatos', icon: '👤' },
-                            { id: 'calendar', label: 'Agenda', icon: '📅' },
-                            { id: 'memory', label: 'Memória', icon: '🧠' },
-                            { id: 'config', label: 'Ajustes', icon: '⚙️' }
-                        ].map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'opacity-40 hover:opacity-100 bg-white/5'}`}
-                            >
-                                <span>{tab.icon}</span>
-                                <span>{tab.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </nav>
-
-                {/* Top Header - Controls & Profile (Desktop Only) */}
-                <header className={`hidden md:flex w-full sticky top-0 z-[60] px-8 py-6 justify-end items-center ${isLight ? 'bg-[#f9f9fb]/80' : 'bg-[#0b0c10]/40'} backdrop-blur-xl transition-all`}>
+                {/* Top Header - Controls & Profile */}
+                <header className={`w-full sticky top-0 z-[60] px-4 md:px-8 py-4 md:py-6 flex justify-end items-center ${isLight ? 'bg-[#f9f9fb]/80' : 'bg-[#0b0c10]/40'} backdrop-blur-xl transition-all`}>
                     <div className="flex items-center gap-5">
                         {user && (
                             <button
