@@ -133,7 +133,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                 model: "gemini-2.0-flash",
                 systemInstruction: `Você é a IA de ${activeTarget.display_name}. 
                 Personalidade: ${activeTarget.ai_settings?.personality || 'Amigável'}.
-                Responda como se estivesse em um chat de texto breve e natural.`
+                O usuário está falando com você via chat. 
+                Responda como se estivesse em um chat de texto (WhatsApp/Telegram). 
+                Seja natural, use emojis se combinar com a personalidade e seja breve.`
             });
 
             const chatHistory = currentHistory.slice(-10).map(m => ({
@@ -153,7 +155,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
             const result = await model.generateContent({ contents: filteredHistory });
             const aiResponseText = result.response.text();
 
-            const { data: aiMsg } = await supabase
+            const { data: aiMsg, error: aiInsertError } = await supabase
                 .from('chat_messages')
                 .insert({
                     sender_id: activeTarget.id,
@@ -163,6 +165,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                 })
                 .select()
                 .single();
+
+            if (aiInsertError) throw aiInsertError;
 
             if (aiMsg) {
                 setMessages(prev => [...prev, aiMsg]);
@@ -195,13 +199,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
             .single();
 
         if (insertError) {
-            setError("Erro ao enviar mensagem.");
+            console.error("Erro ao enviar mensagem:", insertError);
+            setError("Erro ao enviar mensagem. Verifique sua conexão.");
             return;
         }
 
         if (sentMsg) {
             setMessages(prev => [...prev, sentMsg]);
             if (activeIsAi) {
+                console.log("Iniciando resposta da IA com API Key:", apiKey ? "Configurada" : "AUSENTE");
                 handleAiResponse(msgContent, [...messages, sentMsg]);
             }
         }
@@ -266,7 +272,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, targetProfi
                         const isMe = msg.sender_id === currentUser.id;
                         return (
                             <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
-                                <div className={`max-w-[75%] p-5 rounded-3xl ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : (isDark ? 'bg-white/10 text-white' : 'bg-white shadow-md text-slate-800') + ' rounded-tl-none'}`}>
+                                <div className={`max-w-[75%] p-5 rounded-3xl ${isMe ? 'bg-blue-600 text-white rounded-tr-none shadow-xl shadow-blue-500/20' : (isDark ? 'bg-white/10 text-white' : 'bg-white shadow-md text-slate-800') + ' rounded-tl-none'}`}>
                                     <p className="text-[15px] font-medium leading-relaxed">{msg.content}</p>
                                     <div className="text-[9px] mt-2 font-black uppercase tracking-widest opacity-40">
                                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
