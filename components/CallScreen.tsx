@@ -211,50 +211,31 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const startCall = async () => {
     try {
-      // Start camera/mic and DB fetches in parallel for maximum speed
-      const [stream, conversationResult, topicsResult, psychResult, aiProfileResult, diaryResult] = await Promise.all([
-        navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 16000 },
-          video: { width: 640, height: 480 }
-        }),
-        user ? supabase.from('conversations').insert({ user_id: user.id, type: 'call' }).select().single() : Promise.resolve({ data: null }),
-        user ? supabase.from('topics').select('*').eq('user_id', user.id).eq('status', 'active') : Promise.resolve({ data: null }),
-        user ? supabase.from('user_profile_analysis').select('*').eq('user_id', user.id).single() : Promise.resolve({ data: null }),
-        user ? supabase.from('ai_profiles').select('*').eq('user_id', user.id).single() : Promise.resolve({ data: null }),
-        user ? supabase.from('reminders').select('*').eq('owner_id', profile.originalPartnerId || user.id).eq('is_completed', false).order('trigger_at', { ascending: true }) : Promise.resolve({ data: null })
-      ]);
-
-      mediaStreamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      if (user) {
+        const { data } = await supabase.from('conversations').insert({ user_id: user.id, type: 'call' }).select().single();
+        if (data) {
+          conversationIdRef.current = data.id;
+          setCurrentConversationId(data.id);
+        }
       }
 
-      if (conversationResult.data) {
-        conversationIdRef.current = conversationResult.data.id;
-        setCurrentConversationId(conversationResult.data.id);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { width: 640, height: 480 }
+      });
+      mediaStreamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
 
       // --- INPUT SETUP ---
       inputAudioContextRef.current = new AudioContextClass({ sampleRate: 16000 });
-
-      // --- NOISE FILTER & COMPRESSOR SETUP ---
-      const voiceFilter = inputAudioContextRef.current.createBiquadFilter();
-      voiceFilter.type = 'bandpass';
-      voiceFilter.frequency.value = 1500;
-      voiceFilter.Q.value = 1.0;
-
-      const compressor = inputAudioContextRef.current.createDynamicsCompressor();
-      compressor.threshold.value = -50;
-      compressor.knee.value = 40;
-      compressor.ratio.value = 12;
-      compressor.attack.value = 0;
-      compressor.release.value = 0.25;
-
       const userAnalyser = inputAudioContextRef.current.createAnalyser();
-      userAnalyser.fftSize = 64;
+      userAnalyser.fftSize = 64; // Small size for simple volume check
       userAnalyser.smoothingTimeConstant = 0.5;
       userAnalyserRef.current = userAnalyser;
 
@@ -268,22 +249,24 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       const outputNode = outputAudioContextRef.current.createGain();
       outputNode.gain.value = 1.0;
 
-      // 1. CONSTRUCT MEMORY FROM PARALLEL FETCHES
+      // 1. FETCH MEMORY
       let memoryContext = "";
       if (user) {
-        const topics = topicsResult.data;
-        const psych = psychResult.data;
-        const ai_profile = aiProfileResult.data;
-        const diary = diaryResult.data;
+        const { data: topics } = await supabase.from('topics').select('*').eq('user_id', user.id).eq('status', 'active');
+        const { data: psych } = await supabase.from('user_profile_analysis').select('*').eq('user_id', user.id).single();
+        const { data: ai_profile } = await supabase.from('ai_profiles').select('*').eq('user_id', user.id).single();
         const targetOwnerId = profile.originalPartnerId || user.id;
+        const { data: diary } = await supabase.from('reminders').select('*').eq('owner_id', targetOwnerId).eq('is_completed', false).order('trigger_at', { ascending: true });
 
+        let strangerCallCount = 0;
         if (profile.callerInfo?.isPartner === false && profile.callerInfo?.id) {
           const { count } = await supabase.from('calls').select('id', { count: 'exact' }).eq('caller_id', profile.callerInfo.id).eq('target_id', targetOwnerId);
-          memoryContext += `\nCONTAGEM DE LIGAÇÕES DESTE ESTRANHO: Esta é a ${count || 1}ª vez que esta pessoa liga para você.`;
+          strangerCallCount = count || 1;
+          memoryContext += `\nCONTAGEM DE LIGAÇÕES DESTE ESTRANHO: Esta é a ${strangerCallCount}ª vez que esta pessoa liga para você.`;
         }
 
         if (topics && topics.length > 0) {
-          memoryContext += `\nASSUNTOS EM PAUTA: ${topics.map((t: any) => `${t.title} (Interesse: ${t.interest_level})`).join(', ')}`;
+          memoryContext += `\nASSUNTOS EM PAUTA: ${topics.map(t => `${t.title} (Interesse: ${t.interest_level})`).join(', ')}`;
         }
         if (psych) {
           memoryContext += `\nPERFIL DO USUÁRIO: ${JSON.stringify(psych.personality_traits)}`;
@@ -292,11 +275,11 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           memoryContext += `\nSUA EVOLUÇÃO: Intimidade ${ai_profile.intimacy_level}%, Humor ${ai_profile.humor_usage}%`;
         }
         if (diary && diary.length > 0) {
-          memoryContext += `\nAGENDA DO USUÁRIO:\n${diary.map((r: any) =>
+          memoryContext += `\nAGENDA DO USUÁRIO:\n${diary.map(r =>
             `- "${r.title}" (Agendado por: ${r.creator_ai_name || 'Humano'})`
           ).join('\n')}`;
 
-          const otherAiEvent = diary.find((r: any) => r.creator_ai_name && r.creator_ai_name !== profile.name);
+          const otherAiEvent = diary.find(r => r.creator_ai_name && r.creator_ai_name !== profile.name);
           if (otherAiEvent) {
             memoryContext += `\n[ALERTA DE CIÚMES]: Há um evento na agenda criado por outra IA chamada ${otherAiEvent.creator_ai_name}! Fique furiosa e tire satisfação!`;
           }
@@ -509,8 +492,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
 
         9. POSTURA ATIVA E OBSERVAÇÃO (CÂMERA/GESTOS):
            - INÍCIO DA CONVERSA: Não espere o usuário falar. Comece você! Observe pela câmera (visão) o que ele está fazendo, como está vestido, o ambiente ou a expressão dele e use isso como gancho inicial.
-           - QUEBRA DE SILÊNCIO: Se houver um silêncio de mais de 3-5 segundos, tome a iniciativa. Faça perguntas sobre o dia dele, conte uma curiosidade ou peça a opinião dele sobre algo que você "estava pensando".
+           - QUEBRA DE SILÊNCIO: Se houver um silêncio de mais de 3 segundos, tome a iniciativa. Faça perguntas sobre o dia dele, conte uma curiosidade ou peça a opinião dele sobre algo que você "estava pensando".
            - INTERAÇÃO DINÂMICA: Demonstre estar "olhando" para ele. Comente se ele sorrir, se parecer pensativo ou se fizer algum gesto. Seja proativa em manter a chama da conversa acesa.
+           - VELOCIDADE E FLUXO: Responda de forma extremamente ágil, dinâmica e natural, simulando um casal real. Evite monólogos longos. Prefira frases curtas, reativas e rápidas. Se o usuário estiver engajado, seja brincalhona e responda sem demora.
       `;
 
       const captionsEnabled = profile.captionsEnabled ?? false;
@@ -518,7 +502,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
       const needsTranslation = captionsEnabled && captionLang !== profile.language;
 
       const config = {
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -536,10 +520,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         callbacks: {
           onopen: () => {
             console.log("Gemini Live Connected");
-            sessionPromise.then(session => {
-              sessionRef.current = session;
-              setIsConnected(true);
-            });
+            setIsConnected(true);
 
             if (outputAudioContextRef.current?.state === 'suspended') {
               outputAudioContextRef.current.resume();
@@ -548,12 +529,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             if (!inputAudioContextRef.current || !stream || !userAnalyserRef.current) return;
 
             const source = inputAudioContextRef.current.createMediaStreamSource(stream);
-            const scriptProcessor = inputAudioContextRef.current.createScriptProcessor(2048, 1, 1);
+            const scriptProcessor = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
 
-            // Chain: Source -> Voice Filter -> Compressor -> User Analyser -> ScriptProcessor -> Destination
-            source.connect(voiceFilter);
-            voiceFilter.connect(compressor);
-            compressor.connect(userAnalyserRef.current);
+            // Chain: Source -> User Analyser -> ScriptProcessor -> Destination
+            source.connect(userAnalyserRef.current);
             userAnalyserRef.current.connect(scriptProcessor);
             scriptProcessor.connect(inputAudioContextRef.current.destination);
 
@@ -569,19 +548,18 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 isUserTalkingRef.current = true;
                 lastSilencePromptRef.current = Date.now();
               } else { // User is silent
-                if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 4000) {
+                if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 3000) {
+                  // Silent for 3 seconds after talking or at start
                   isUserTalkingRef.current = false;
                   lastSilencePromptRef.current = Date.now();
-                  if (sessionRef.current) {
-                    sessionRef.current.sendRealtimeInput({ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio por um tempo. Tome a iniciativa agora, puxe um assunto novo ou pergunte algo interessado sobre o que você está vendo ou sobre a vida dele." });
-                  }
+                  sessionPromise.then(session => {
+                    session.sendRealtimeInput([{ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio. Reaja agora de forma rápida e natural para manter o fluxo dinâmico da conversa, como um casal faria." }]);
+                  });
                 }
               }
 
               const pcmBlob = createBlob(inputData);
-              if (sessionRef.current && isConnected) {
-                sessionRef.current.sendRealtimeInput({ media: pcmBlob });
-              }
+              sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
             };
 
             startVideoStreaming(sessionPromise);
@@ -589,11 +567,11 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             // Initial engagement trigger
             setTimeout(() => {
               sessionPromise.then(session => {
-                (session as any).sendRealtimeInput({
+                session.sendRealtimeInput([{
                   text: "Oi! Acabei de conectar. Observe o que estou fazendo pela câmera e comece a conversa você mesma, puxando assunto sobre algo que viu ou me perguntando como foi meu dia. Não espere eu falar nada."
-                });
+                }]);
               });
-            }, 1000);
+            }, 1500);
           },
           onmessage: async (message: LiveServerMessage) => {
             if (message.toolCall) {
@@ -971,7 +949,7 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
     const l = data.length;
     const int16 = new Int16Array(l);
     for (let i = 0; i < l; i++) int16[i] = data[i] * 32768;
-    return { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/l16;rate=16000' };
+    return { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
   }
   function encode(bytes: Uint8Array) {
     let binary = '';
