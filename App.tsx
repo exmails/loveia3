@@ -478,8 +478,8 @@ function App() {
               currentPartnerNumber: cProfile.ai_settings?.currentPartnerNumber || '',
               currentPartnerNickname: cProfile.ai_settings?.currentPartnerNickname || '',
               callerInfo: {
-                id: cProfile.id,
-                name: cProfile.display_name,
+                id: cProfile?.id,
+                name: cProfile?.display_name,
                 isPartner: false
               },
               captionsEnabled: profile.captionsEnabled,

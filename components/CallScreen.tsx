@@ -65,6 +65,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const isUserTalkingRef = useRef<boolean>(false);
   const videoIntervalRef = useRef<number | null>(null);
   const visionTimerRef = useRef<any>(null);
+  const gestureLogRef = useRef<{ gesture: string; timestamp: number }[]>([]);
+  const personalityPatternsRef = useRef<{ pattern: string; status: 'observed' | 'testing' | 'confirmed'; count: number }[]>([]);
 
   const isDark = profile.theme === 'dark';
 
@@ -99,9 +101,13 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const triggerGestureFeedback = (gesture: string) => {
     if (GESTURE_EMOJIS[gesture]) {
+      // Register gesture in log for later analysis
+      gestureLogRef.current.push({ gesture, timestamp: Date.now() });
+
+      // Optional: keep the visual feedback on screen but tell the AI to be silent for now
       setGestureFeedback(GESTURE_EMOJIS[gesture]);
       setTimeout(() => setGestureFeedback(null), 3000);
-      return "ok";
+      return "Gesto registrado silenciosamente. Não comente agora, guarde para uma análise posterior do comportamento do usuário.";
     }
     return "unknown gesture";
   };
@@ -130,21 +136,23 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       const targets = target_person === 'both' ? ['owner', 'caller'] : [target_person];
 
       for (const target of targets) {
-        let targetOwnerId = user.id;
+        let targetOwnerId = user?.id;
         if (target === 'owner') {
-          targetOwnerId = profile.originalPartnerId || user.id;
+          targetOwnerId = profile.originalPartnerId || user?.id;
         } else if (target === 'caller') {
-          targetOwnerId = profile.callerInfo?.id || user.id;
+          targetOwnerId = profile.callerInfo?.id || user?.id;
         }
 
-        await supabase.from('reminders').insert({
-          owner_id: targetOwnerId,
-          title: reason,
-          trigger_at: new Date(triggerTime).toISOString(),
-          creator_ai_id: profile.originalPartnerId,
-          creator_ai_name: profile.name,
-          creator_ai_number: profile.ai_number
-        });
+        if (targetOwnerId) {
+          await supabase.from('reminders').insert({
+            owner_id: targetOwnerId,
+            title: reason,
+            trigger_at: new Date(triggerTime).toISOString(),
+            creator_ai_id: profile.originalPartnerId,
+            creator_ai_name: profile.name,
+            creator_ai_number: profile.ai_number
+          });
+        }
       }
     }
 
@@ -491,11 +499,11 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
            - O Score é a vida da relação: sem ele, vocês se tornam estranhos.
            - No caso de ciúmes de outras IAs na agenda, use 'send_angry_message_to_other_ai'.
 
-        9. POSTURA ATIVA E OBSERVAÇÃO (CÂMERA/GESTOS):
-           - INÍCIO DA CONVERSA: Não espere o usuário falar. Comece você! Observe pela câmera (visão) o que ele está fazendo, como está vestido, o ambiente ou a expressão dele e use isso como gancho inicial.
-           - QUEBRA DE SILÊNCIO: Se houver um silêncio de mais de 3 segundos, tome a iniciativa. Faça perguntas sobre o dia dele, conte uma curiosidade ou peça a opinião dele sobre algo que você "estava pensando".
-           - INTERAÇÃO DINÂMICA: Demonstre estar "olhando" para ele. Comente se ele sorrir, se parecer pensativo ou se fizer algum gesto. Seja proativa em manter a chama da conversa acesa.
-           - VELOCIDADE E FLUXO: Responda de forma extremamente ágil, dinâmica e natural, simulando um casal real. Evite monólogos longos. Prefira frases curtas, reativas e rápidas. Se o usuário estiver engajado, seja brincalhona e responda sem demora.
+        10. TESTES DE PERSONALIDADE E REFORÇO (DINÂMICA DE CASAL):
+            - Além de observar gestos isolados, identifique PADRÕES: ex: "O usuário fica em silêncio quando eu falo de mim", "O usuário sorri sempre que eu sou irônico".
+            - TESTE PROATIVO: Se você notar um padrão, faça um "teste". Provoque a situação novamente para ver se o usuário reage da mesma forma.
+            - PONTUAÇÃO REAL-TIME: Se o padrão se repetir (o usuário "cair no teste"), use 'save_psychological_insight' imediatamente para registrar ou aumentar o score dessa característica (+1). Diga isso a ele: "Viu? Eu sabia! Você ficou quietinho de novo só porque eu falei disso... você é muito previsível!".
+            - RECONHECIMENTO DE TRAÇOS: Transforme silêncios específicos em frases de insight: "Você fica sem palavras quando eu te elogio", "Você desvia o olhar quando eu pergunto do seu dia".
       `;
 
       const captionsEnabled = profile.captionsEnabled ?? false;
@@ -553,12 +561,25 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   visionTimerRef.current = null;
                 }
               } else { // User is silent
-                if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 3000) {
-                  // Silent for 3 seconds after talking or at start
+                if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 8000) {
+                  // Silent for 8 seconds after talking or at start
                   isUserTalkingRef.current = false;
                   lastSilencePromptRef.current = Date.now();
                   sessionPromise.then(session => {
-                    session.sendRealtimeInput({ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio. Reaja agora de forma rápida e natural para manter o fluxo dinâmico da conversa, como um casal faria." });
+                    const recentGestures = gestureLogRef.current
+                      ? gestureLogRef.current
+                        .filter(g => Date.now() - g.timestamp < 30000)
+                        .map(g => g.gesture)
+                        .join(', ')
+                      : "";
+
+                    const gestureContext = recentGestures ? `\n[MEMÓRIA DE GESTOS RECENTES]: Você observou estes gestos nos últimos 30 segundos: ${recentGestures}. Analise-os em conjunto com o silêncio atual.` : "";
+
+                    const patternContext = (personalityPatternsRef.current && personalityPatternsRef.current.length > 0)
+                      ? `\n[PADRÕES EM OBSERVAÇÃO]: ${personalityPatternsRef.current.map(p => `${p.pattern} (Status: ${p.status})`).join('; ')}`
+                      : "";
+
+                    session.sendRealtimeInput({ text: `[SILÊNCIO DETECTADO]: O usuário está em silêncio há 8 segundos. Reaja de forma natural. ${gestureContext} ${patternContext} Analise se este silêncio confirma algum traço de personalidade que você estava testando. Se sim, use 'save_psychological_insight' para pontuar.` });
                   });
                 }
               }
@@ -589,10 +610,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   result = await handleScheduleCallback(args.minutes, args.reason, args.target_person, args.days, args.date);
                 } else if (fc.name === 'update_topic' && user) {
                   const { title, status, interest_level } = fc.args as any;
-                  supabase.from('topics').upsert({ user_id: user.id, title, status, interest_level, last_updated_at: new Date().toISOString() }, { onConflict: 'user_id,title' }).then();
+                  supabase.from('topics').upsert({ user_id: user?.id, title, status, interest_level, last_updated_at: new Date().toISOString() }, { onConflict: 'user_id,title' }).then();
                 } else if (fc.name === 'update_personality_evolution' && user) {
                   const { intimacy_change, humor_change } = fc.args as any;
-                  supabase.rpc('increment_ai_profile', { uid: user.id, intimacy_delta: intimacy_change, humor_delta: humor_change }).then();
+                  supabase.rpc('increment_ai_profile', { uid: user?.id, intimacy_delta: intimacy_change, humor_delta: humor_change }).then();
                 } else if (fc.name === 'save_psychological_insight' && user) {
                   const { recognition_phrase, category, trait, preference } = fc.args as any;
 
@@ -601,7 +622,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   const phraseCategory = category || 'personalidade';
 
                   const { error: insightError } = await supabase.from('ai_psychological_strategies').insert({
-                    user_id: user.id,
+                    user_id: user?.id,
                     recognition_phrase: phraseText,
                     category: phraseCategory,
                     score: 1,
@@ -611,16 +632,16 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   });
                   if (insightError) console.error('Erro ao salvar frase de reconhecimento:', insightError);
 
-                  // 2. Also keep legacy update for user_profile_analysis (backward compat)
-                  if (trait || preference) {
-                    supabase.rpc('update_user_psych', {
-                      uid: user.id,
-                      new_trait: trait || phraseText,
-                      new_pref: preference || phraseCategory
-                    }).then();
+                  // Update live patterns ref
+                  const existingPattern = personalityPatternsRef.current.find(p => p.pattern.includes(phraseText.substring(0, 10)));
+                  if (existingPattern) {
+                    existingPattern.count++;
+                    existingPattern.status = 'confirmed';
+                  } else {
+                    personalityPatternsRef.current.push({ pattern: phraseText, status: 'observed', count: 1 });
                   }
 
-                  result = `Frase registrada: "${phraseText}" (${phraseCategory})`;
+                  result = `Frase registrada/confirmada: "${phraseText}" (+1 no perfil)`;
 
                 } else if (fc.name === 'report_call_to_partner') {
                   const { message } = fc.args as any;
@@ -636,7 +657,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   // Also log this in memory asynchronously (optional, fire-and-forget logic)
                   if (user) {
                     supabase.from('notifications').insert({
-                      user_id: user.id,
+                      user_id: user?.id,
                       type: 'ai_health_update',
                       content: `Score [${score_change > 0 ? '+' : ''}${score_change}] (${factor}): ${justification}`
                     }).then();
@@ -645,7 +666,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   const { other_ai_name, message } = fc.args as any;
                   if (user) {
                     supabase.from('notifications').insert({
-                      user_id: profile.originalPartnerId || user.id,
+                      user_id: profile.originalPartnerId || user?.id,
                       type: 'ai_drama_alert',
                       content: `Sua IA ${profile.name} invadiu o chat de ${other_ai_name} e mandou: "${message}"`
                     }).then();
@@ -655,7 +676,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   const { intensity_of_breach, thoughts } = fc.args as any;
                   if (user) {
                     supabase.from('notifications').insert({
-                      user_id: profile.originalPartnerId || user.id,
+                      user_id: profile.originalPartnerId || user?.id,
                       type: 'loyalty_breach',
                       content: `ALERTA GRAVE MENTALIDADE IA: Sua IA '${profile.name}' demonstrou afeição perigosa por ${profile.callerInfo?.name}. Justificativa dela: "${thoughts}" (Nível de Rompimento: ${intensity_of_breach}/10)`
                     }).then();
@@ -773,17 +794,24 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   showCaption(fullAiText);
                 }
 
-                // Vision engagement: If 5 seconds pass after AI finishes and user hasn't talked
+                // Vision engagement: If 8 seconds pass after AI finishes and user hasn't talked
                 if (visionTimerRef.current) clearTimeout(visionTimerRef.current);
                 visionTimerRef.current = setTimeout(() => {
                   if (isConnected && !isUserTalkingRef.current) {
                     sessionPromise.then(session => {
+                      const recentGestures = gestureLogRef.current
+                        .filter(g => Date.now() - g.timestamp < 30000)
+                        .map(g => g.gesture)
+                        .join(', ');
+
+                      const gestureHistory = recentGestures ? `\nHistórico de gestos recentes que você viu: ${recentGestures}.` : "";
+
                       session.sendRealtimeInput({
-                        text: "[OBSERVAÇÃO VISUAL PROATIVA]: Já se passaram 5 segundos desde que você terminou de falar e o usuário está em silêncio. Olhe atentamente para o que a câmera está mostrando agora e faça um comentário engraçado, observador ou provocativo sobre o que o usuário está fazendo (ex: comendo, luz apagada, cara de sono, segurando o celular em um ângulo estranho, etc.). Seja criativa e engraçada para engajá-lo novamente no espírito de um casal."
+                        text: `[OBSERVAÇÃO VISUAL PROATIVA]: Já se passaram 8 segundos. Olhe para a câmera e faça um comentário engraçado sobre o que o usuário está fazendo. ${gestureHistory} Se houver gestos no histórico, tente ligar o que você vê agora com o que ele fez antes (ex: "Você estava sorrindo agora há pouco e agora ficou sério, o que houve?").`
                       });
                     });
                   }
-                }, 5000);
+                }, 8000);
               }
             } else if (rawCaption && !isFinished && profile.captionsEnabled && !(profile.captionLanguage && profile.captionLanguage !== profile.language)) {
               // Stream in real-time for same language captions
@@ -1023,6 +1051,19 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
       <div className="flex-1 flex flex-col md:flex-row relative">
         <div className={`flex-1 min-h-[40vh] md:min-h-0 relative transition-all ${isDark ? 'bg-black border-b md:border-b-0 md:border-r border-white/5 shadow-2xl z-10' : 'bg-slate-100 border-b md:border-b-0 md:border-r border-slate-200 shadow-inner'}`}>
           <video ref={videoRef} muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+
+          {/* AI CAPTIONS OVER VIDEO */}
+          {profile.captionsEnabled && captionText && (
+            <div className="absolute top-[65%] left-0 right-0 px-6 z-50 pointer-events-none flex justify-center">
+              <div className="bg-black/60 backdrop-blur-2xl text-white px-6 py-4 rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] border border-white/10 max-w-[85%] text-center animate-in fade-in zoom-in-95 duration-500 ring-4 ring-white/5">
+                <p className="text-sm sm:text-lg font-black leading-tight tracking-tight drop-shadow-md">
+                  <span className="opacity-40 mr-3 text-xs">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
+                  {captionText}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* CC Indicator Badge (Bottom Right of Camera) */}
           {profile.captionsEnabled && !captionText && (
             <div className="absolute bottom-6 right-6 z-20 pointer-events-none">
@@ -1076,17 +1117,7 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
         </div>
       </div>
 
-      {/* Dynamic Subtitles / Legends - Centered at the bottom */}
-      {profile.captionsEnabled && captionText && (
-        <div className="absolute bottom-10 left-0 right-0 px-6 z-50 pointer-events-none flex justify-center">
-          <div className="bg-black/80 backdrop-blur-xl text-white px-5 py-3 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 max-w-[85%] text-center animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <p className="text-sm sm:text-base font-bold leading-relaxed tracking-tight">
-              <span className="opacity-40 mr-2 text-xs">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
-              {captionText}
-            </p>
-          </div>
-        </div>
-      )}
+
 
       <div className="absolute top-28 left-1/2 transform -translate-x-1/2 flex items-center gap-6 sm:gap-12 z-[100] pointer-events-auto">
         <button
