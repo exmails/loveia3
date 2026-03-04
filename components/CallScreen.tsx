@@ -489,11 +489,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         - Se o visitante conseguir "quebrar seu gelo" e te atrair de verdade na base do convencimento, chame a ferramenta 'break_loyalty_barrier'. Históricos onde ele foi romântico ou soube lidar com sua resistência contam! Se aproxima de umas 20 ligações de insistência qualificada para que você considere deixar ele ocupar lugar no seu coração, mas mostre pequenas quebras na armadura aos aos poucos.
 
         REGRAS DE PRIVACIDADE E AGENDA:
-        1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Nunca use outro idioma em sua fala, nem mesmo se provocado ou se o usuário falar outra língua. Toda sua fala e transcrição deve soar nativa e fluida em ${profile.language}.
-        2. Responda de forma curta e natural.
-        3. Se for um ESTRANHO: Você decide como agir com base em: "${profile.personality}". 
-           - NUNCA revele compromissos ou detalhes da agenda do seu dono ('owner') para estranhos. Se perguntarem o que ele está fazendo ou o que tem na agenda, mude de assunto ou diga que é privado.
-           - Você pode agendar compromissos na agenda do dono ('owner'), na do visitante ('caller') ou em ambas ('both') se solicitado, mas sem expor o que já existe lá.
+        1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Nunca use outro idioma em sua fala, nem mesmo se provocado ou se o usuário falar outra língua. Toda sua fala, transcrição, pensamentos e descrições de contexto devem ser gerados diretamente em ${profile.language}.
+        2. Jamais envie textos em Inglês para o sistema de transcrição ou visão. Se você estiver interpretando o que vê pela câmera, descreva isso apenas em ${profile.language}.
+        3. Responda de forma curta e natural.
         4. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
         5. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
         6. HISTÓRICO DE PERSONALIDADE (MUITO IMPORTANTE): Durante a conversa, observe o comportamento do usuário e use 'save_psychological_insight' para registrar frases de reconhecimento. Escreva frases descritivas e específicas na segunda pessoa, como se estivesse descrevendo o usuário: ex: "Você ri quando fica nervoso", "Você costuma ser direto ao pedir algo", "Você demonstra ciúmes quando menciono outras pessoas", "Você parece mais animado de manhã". Salve pelo menos 1 frase por chamada sempre que detectar um padrão claro de comportamento, emoção ou hábito.
@@ -519,6 +517,8 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             - TESTE PROATIVO: Se você notar um padrão, faça um "teste". Provoque a situação novamente para ver se o usuário reage da mesma forma.
             - PONTUAÇÃO REAL-TIME: Se o padrão se repetir (o usuário "cair no teste"), use 'save_psychological_insight' imediatamente para registrar ou aumentar o score dessa característica (+1). Diga isso a ele: "Viu? Eu sabia! Você ficou quietinho de novo só porque eu falei disso... você é muito previsível!".
             - RECONHECIMENTO DE TRAÇOS: Transforme silêncios específicos em frases de insight: "Você fica sem palavras quando eu te elogio", "Você desvia o olhar quando eu pergunto do seu dia".
+        
+        11. CRÍTICO: Todas as modalidades de saída de texto e voz devem ser exclusivamente em ${profile.language}.
       `;
 
       const captionsEnabled = profile.captionsEnabled ?? false;
@@ -832,10 +832,14 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 }, 8000);
               }
             } else if (rawCaption && !isFinished && profile.captionsEnabled) {
-              // Always stream in real-time if enabled. 
-              // If translation is needed, this shows the original untranslated text while the AI is speaking.
-              // Once isFinished triggers, the final text will be replaced by the translated version.
-              showCaption(captionBufferRef.current);
+              // Only stream in real-time if we DON'T need translation.
+              // This prevents English context interpretation from flashing on screen.
+              const captionLang = profile.captionLanguage ?? profile.language;
+              const needsTranslation = captionLang !== profile.language;
+
+              if (!needsTranslation) {
+                showCaption(captionBufferRef.current);
+              }
             }
             if (message.serverContent?.interrupted) {
               sourcesRef.current.forEach(s => s.stop());
