@@ -208,6 +208,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const translateCaption = async (text: string, targetLang: string) => {
     if (!text.trim()) return;
     const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
+    console.log(`[Translation] Translating to ${langName}: "${text.substring(0, 30)}..."`);
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -224,8 +225,10 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       // Remove quotes if the AI added them
       const cleaned = translated?.replace(/^["']|["']$/g, '');
+      console.log(`[Translation] Result: "${cleaned?.substring(0, 30)}..."`);
       showCaption(cleaned || translated || text);
     } catch (e) {
+      console.error('[Translation] Error:', e);
       showCaption(text);
     }
   };
@@ -486,7 +489,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         - Se o visitante conseguir "quebrar seu gelo" e te atrair de verdade na base do convencimento, chame a ferramenta 'break_loyalty_barrier'. Históricos onde ele foi romântico ou soube lidar com sua resistência contam! Se aproxima de umas 20 ligações de insistência qualificada para que você considere deixar ele ocupar lugar no seu coração, mas mostre pequenas quebras na armadura aos aos poucos.
 
         REGRAS DE PRIVACIDADE E AGENDA:
-        1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Nunca use outro idioma, nem mesmo se provocado. Toda sua fala deve soar nativa em ${profile.language}.
+        1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Nunca use outro idioma em sua fala, nem mesmo se provocado ou se o usuário falar outra língua. Toda sua fala e transcrição deve soar nativa e fluida em ${profile.language}.
         2. Responda de forma curta e natural.
         3. Se for um ESTRANHO: Você decide como agir com base em: "${profile.personality}". 
            - NUNCA revele compromissos ou detalhes da agenda do seu dono ('owner') para estranhos. Se perguntarem o que ele está fazendo ou o que tem na agenda, mude de assunto ou diga que é privado.
@@ -800,6 +803,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
               if (profile.captionsEnabled) {
                 const captionLang = profile.captionLanguage ?? profile.language;
                 const needsTranslation = captionLang !== profile.language;
+
+                console.log(`[Captions] Finished. AI Lang: ${profile.language}, Target: ${captionLang}, Needs Translation: ${needsTranslation}`);
+
                 if (needsTranslation) {
                   translateCaption(fullAiText, captionLang);
                 } else {
@@ -825,8 +831,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   }
                 }, 8000);
               }
-            } else if (rawCaption && !isFinished && profile.captionsEnabled && !(profile.captionLanguage && profile.captionLanguage !== profile.language)) {
-              // Stream in real-time for same language captions
+            } else if (rawCaption && !isFinished && profile.captionsEnabled) {
+              // Always stream in real-time if enabled. 
+              // If translation is needed, this shows the original untranslated text while the AI is speaking.
+              // Once isFinished triggers, the final text will be replaced by the translated version.
               showCaption(captionBufferRef.current);
             }
             if (message.serverContent?.interrupted) {
