@@ -1110,7 +1110,21 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
         </div>
       </div>
 
-
+      {/* AI CAPTIONS - INTEGRATED IN BACKGROUND LAYER */}
+      {profile.captionsEnabled && captionText && (
+        <div className="absolute bottom-40 left-1/2 -translate-x-1/2 w-[92%] max-w-xl z-[80] pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="bg-black/50 backdrop-blur-3xl border border-white/20 p-6 rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] text-center ring-1 ring-white/10">
+            <div className="flex items-center justify-center gap-2 mb-3 opacity-60">
+              <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse" />
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white">Live AI Voice</span>
+              <span className="text-xs">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
+            </div>
+            <p className="text-white text-lg sm:text-xl md:text-2xl font-bold leading-tight tracking-tight drop-shadow-xl italic">
+              "{captionText}"
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Control Buttons Layer */}
       <div className="absolute top-28 left-1/2 transform -translate-x-1/2 flex items-center gap-6 sm:gap-12 z-[100] pointer-events-auto">
@@ -1134,29 +1148,6 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
           </svg>
         </button>
       </div>
-
-      {/* AI CAPTIONS - GLOBAL OVERLAY (Guaranteed Visibility) */}
-      {profile.captionsEnabled && captionText && (
-        <div className="fixed inset-0 pointer-events-none z-[9999] flex flex-col items-end justify-center p-4 sm:p-10">
-          <div className="w-full sm:w-[400px] bg-black/60 backdrop-blur-3xl border border-white/20 p-8 rounded-[3rem] shadow-[0_64px_128px_-32px_rgba(0,0,0,0.9)] animate-in slide-in-from-right-12 fade-in duration-700 ring-2 ring-white/5">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse shadow-[0_0_15px_rgba(236,72,153,0.8)]" />
-                <span className="text-[11px] font-black uppercase tracking-[0.3em] text-white/60">Live Transcription</span>
-              </div>
-              <span className="text-lg">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
-            </div>
-            <p className="text-white text-lg sm:text-2xl font-bold leading-tight tracking-tight drop-shadow-2xl italic">
-              "{captionText}"
-            </p>
-            <div className="mt-8 flex gap-2">
-              <div className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-pink-500 animate-[progress_3s_linear_infinite]" />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
