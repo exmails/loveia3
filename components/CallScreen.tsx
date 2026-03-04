@@ -1052,12 +1052,12 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
         <div className={`flex-1 min-h-[40vh] md:min-h-0 relative transition-all ${isDark ? 'bg-black border-b md:border-b-0 md:border-r border-white/5 shadow-2xl z-10' : 'bg-slate-100 border-b md:border-b-0 md:border-r border-slate-200 shadow-inner'}`}>
           <video ref={videoRef} muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
 
-          {/* AI CAPTIONS OVER VIDEO */}
+          {/* AI CAPTIONS OVER VIDEO - Positioned above local camera badge */}
           {profile.captionsEnabled && captionText && (
-            <div className="absolute top-[65%] left-0 right-0 px-6 z-50 pointer-events-none flex justify-center">
-              <div className="bg-black/60 backdrop-blur-2xl text-white px-6 py-4 rounded-[2.5rem] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] border border-white/10 max-w-[85%] text-center animate-in fade-in zoom-in-95 duration-500 ring-4 ring-white/5">
-                <p className="text-sm sm:text-lg font-black leading-tight tracking-tight drop-shadow-md">
-                  <span className="opacity-40 mr-3 text-xs">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
+            <div className="absolute bottom-24 left-0 right-0 px-4 z-50 pointer-events-none flex justify-center">
+              <div className="bg-black/70 backdrop-blur-2xl text-white px-5 py-2.5 rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.6)] border border-white/20 max-w-[95%] text-center animate-in fade-in zoom-in-95 duration-500 scale-100 sm:scale-110 ring-2 ring-white/10">
+                <p className="text-xs sm:text-base font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,1)]">
+                  <span className="opacity-60 mr-2 text-[10px] font-bold">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
                   {captionText}
                 </p>
               </div>
