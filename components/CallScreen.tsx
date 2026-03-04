@@ -64,6 +64,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const userTalkingTimeoutRef = useRef<any>(null);
   const isUserTalkingRef = useRef<boolean>(false);
   const videoIntervalRef = useRef<number | null>(null);
+  const visionTimerRef = useRef<any>(null);
 
   const isDark = profile.theme === 'dark';
 
@@ -547,13 +548,17 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
               if (rms > 0.01) { // User is talking
                 isUserTalkingRef.current = true;
                 lastSilencePromptRef.current = Date.now();
+                if (visionTimerRef.current) {
+                  clearTimeout(visionTimerRef.current);
+                  visionTimerRef.current = null;
+                }
               } else { // User is silent
                 if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 3000) {
                   // Silent for 3 seconds after talking or at start
                   isUserTalkingRef.current = false;
                   lastSilencePromptRef.current = Date.now();
                   sessionPromise.then(session => {
-                    session.sendRealtimeInput([{ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio. Reaja agora de forma rápida e natural para manter o fluxo dinâmico da conversa, como um casal faria." }]);
+                    session.sendRealtimeInput({ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio. Reaja agora de forma rápida e natural para manter o fluxo dinâmico da conversa, como um casal faria." });
                   });
                 }
               }
@@ -567,9 +572,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             // Initial engagement trigger
             setTimeout(() => {
               sessionPromise.then(session => {
-                session.sendRealtimeInput([{
+                session.sendRealtimeInput({
                   text: "Oi! Acabei de conectar. Observe o que estou fazendo pela câmera e comece a conversa você mesma, puxando assunto sobre algo que viu ou me perguntando como foi meu dia. Não espere eu falar nada."
-                }]);
+                });
               });
             }, 1500);
           },
@@ -767,6 +772,18 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 } else {
                   showCaption(fullAiText);
                 }
+
+                // Vision engagement: If 5 seconds pass after AI finishes and user hasn't talked
+                if (visionTimerRef.current) clearTimeout(visionTimerRef.current);
+                visionTimerRef.current = setTimeout(() => {
+                  if (isConnected && !isUserTalkingRef.current) {
+                    sessionPromise.then(session => {
+                      session.sendRealtimeInput({
+                        text: "[OBSERVAÇÃO VISUAL PROATIVA]: Já se passaram 5 segundos desde que você terminou de falar e o usuário está em silêncio. Olhe atentamente para o que a câmera está mostrando agora e faça um comentário engraçado, observador ou provocativo sobre o que o usuário está fazendo (ex: comendo, luz apagada, cara de sono, segurando o celular em um ângulo estranho, etc.). Seja criativa e engraçada para engajá-lo novamente no espírito de um casal."
+                      });
+                    });
+                  }
+                }, 5000);
               }
             } else if (rawCaption && !isFinished && profile.captionsEnabled && !(profile.captionLanguage && profile.captionLanguage !== profile.language)) {
               // Stream in real-time for same language captions
@@ -943,6 +960,7 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
     if (outputAudioContextRef.current) outputAudioContextRef.current.close();
     if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
     if (captionTimerRef.current) clearTimeout(captionTimerRef.current);
+    if (visionTimerRef.current) clearTimeout(visionTimerRef.current);
   };
 
   function createBlob(data: Float32Array): BlobData {
