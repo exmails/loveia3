@@ -187,7 +187,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
     setCaptionText(text.trim());
     captionTimerRef.current = window.setTimeout(() => {
       setCaptionText('');
-    }, 8000);
+      captionBufferRef.current = '';
+    }, 6000);
   };
 
   // Translate via Gemini generateContent (lightweight text call)
@@ -1051,23 +1052,23 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
         <div className={`flex-1 min-h-[40vh] md:min-h-0 relative transition-all ${isDark ? 'bg-black border-b md:border-b-0 md:border-r border-white/5 shadow-2xl z-10' : 'bg-slate-100 border-b md:border-b-0 md:border-r border-slate-200 shadow-inner'}`}>
           <video ref={videoRef} muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
 
-          {/* AI CAPTIONS OVER VIDEO - Positioned above local camera badge */}
-          {profile.captionsEnabled && (captionText || !isConnected) && (
-            <div className="absolute bottom-[20%] left-0 right-0 px-6 z-[100] pointer-events-none flex justify-center">
-              <div className="bg-black/80 backdrop-blur-3xl text-white px-8 py-4 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.8)] border border-white/20 max-w-[90%] text-center animate-in fade-in zoom-in-95 duration-500 ring-2 ring-white/10">
-                <p className="text-base sm:text-lg font-black leading-snug tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                  {!isConnected ? (
-                    <span className="flex items-center gap-3 justify-center text-blue-400">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-                      CONECTANDO IA...
-                    </span>
+          {/* AI CAPTIONS OVER VIDEO - Contact Format Pill */}
+          {profile.captionsEnabled && captionText && (
+            <div className="absolute bottom-24 left-0 right-0 px-4 z-50 pointer-events-none flex justify-center">
+              <div className="bg-black/80 backdrop-blur-2xl text-white pl-2 pr-6 py-2 rounded-full shadow-[0_20px_40px_rgba(0,0,0,0.6)] border border-white/20 max-w-[95%] flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500 ring-2 ring-white/10">
+                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
+                  {profile.image ? (
+                    <img src={profile.image} className="w-full h-full object-cover" alt="AI Avatar" />
                   ) : (
-                    <>
-                      <span className="opacity-60 mr-3 text-sm">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
-                      {captionText}
-                    </>
+                    <div className="w-full h-full bg-blue-500/20 flex items-center justify-center text-xl">⚡</div>
                   )}
-                </p>
+                </div>
+                <div className="flex flex-col items-start overflow-hidden">
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-0.5">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag} {profile.name}</p>
+                  <p className="text-sm sm:text-base font-bold leading-tight tracking-tight text-white line-clamp-2">
+                    {captionText}
+                  </p>
+                </div>
               </div>
             </div>
           )}
