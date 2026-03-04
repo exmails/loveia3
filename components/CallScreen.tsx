@@ -1055,7 +1055,33 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
           {/* CC Indicator Badge (Bottom Right of Camera) */}
           {profile.captionsEnabled && !captionText && (
             <div className="absolute bottom-6 right-6 z-20 pointer-events-none">
-              <span className="bg-black/50 backdrop-blur-md text-white/40 text-[9px] font-black px-2 py-1 rounded-xl tracking-widest border border-white/5 uppercase tracking-[0.2em] animate-pulse">CC Ativo</span>
+              <span className="bg-white/10 backdrop-blur-md text-white/50 text-[9px] font-black px-3 py-1.5 rounded-full tracking-widest border border-white/10 uppercase tracking-[0.2em] animate-pulse flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+                Legendas Ativas
+              </span>
+            </div>
+          )}
+
+          {/* AI CAPTIONS - PREMIUM SIDE BAR DESIGN */}
+          {profile.captionsEnabled && captionText && (
+            <div className="absolute right-0 top-0 bottom-0 w-full sm:w-[320px] p-6 flex flex-col justify-center z-[100] pointer-events-none">
+              <div className="bg-black/40 backdrop-blur-3xl border border-white/10 p-6 rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] animate-in slide-in-from-right-8 fade-in duration-500 ring-1 ring-white/5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,0.8)]" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">AI Voice</span>
+                  </div>
+                  <span className="text-xs">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
+                </div>
+                <p className="text-white text-base sm:text-xl font-black leading-tight tracking-tight drop-shadow-xl selection:bg-pink-500/50">
+                  {captionText}
+                </p>
+                <div className="mt-4 flex gap-1">
+                  <div className="h-0.5 flex-1 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-pink-500/50 animate-[progress_2s_ease-in-out_infinite]" style={{ width: '40%' }} />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1106,21 +1132,6 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
       </div>
 
 
-
-      {/* GLOBAL TOP-LEVEL CAPTIONS - Centered at the bottom over everything */}
-      {profile.captionsEnabled && captionText && (
-        <div className="fixed bottom-28 left-0 right-0 px-4 sm:px-10 z-[1000] pointer-events-none flex justify-center">
-          <div className="bg-black/80 backdrop-blur-2xl text-white px-6 py-4 rounded-3xl shadow-[0_30px_60px_-12px_rgba(0,0,0,0.8)] border border-white/20 max-w-3xl w-full text-center animate-in fade-in slide-in-from-bottom-6 duration-500 scale-100 ring-1 ring-white/10">
-            <div className="flex items-center justify-center gap-3 mb-1">
-              <span className="bg-white/10 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-[0.2em] text-white/40 border border-white/5">Transmissão Direta</span>
-              <span className="text-xs">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
-            </div>
-            <p className="text-sm sm:text-lg md:text-xl font-bold leading-snug tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">
-              {captionText}
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Control Buttons Layer */}
       <div className="absolute top-28 left-1/2 transform -translate-x-1/2 flex items-center gap-6 sm:gap-12 z-[100] pointer-events-auto">
