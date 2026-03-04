@@ -26,6 +26,19 @@ const GESTURE_EMOJIS: Record<string, string> = {
   'look_away': '👀 Olhando pro lado...'
 };
 
+const LANGUAGE_NAME_MAP: Record<string, string> = {
+  'Português': 'Portuguese',
+  'English': 'English',
+  'Español': 'Spanish',
+  'Français': 'French',
+  'Italiano': 'Italian',
+  'Deutsch': 'German',
+  '日本語': 'Japanese',
+  '中文': 'Chinese',
+  '한국어': 'Korean',
+  'العربية': 'Arabic'
+};
+
 export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onEndCall, onScoreChange, apiKey, user }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -194,6 +207,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   // Translate via Gemini generateContent (lightweight text call)
   const translateCaption = async (text: string, targetLang: string) => {
     if (!text.trim()) return;
+    const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -201,14 +215,16 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `Translate this AI voice transcription to ${targetLang} (reply ONLY the translation): "${text}"` }] }],
+            contents: [{ parts: [{ text: `Translate this AI voice transcription to ${langName} (reply ONLY the translation): "${text}"` }] }],
             generationConfig: { maxOutputTokens: 500, temperature: 0 }
           })
         }
       );
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      showCaption(translated || text);
+      // Remove quotes if the AI added them
+      const cleaned = translated?.replace(/^["']|["']$/g, '');
+      showCaption(cleaned || translated || text);
     } catch (e) {
       showCaption(text);
     }
@@ -456,7 +472,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         Personalidade: ${profile.personality}
         Humor: ${profile.mood}
         Sotaque: ${accentData.label} (${accentData.desc}).
-        Idioma: ${profile.language}.
+        Idioma Primário: ${profile.language}.
         
         DATA ATUAL: ${new Date().toLocaleString()}
         CONTEXTO ATUAL: ${extraContext || profile.dailyContext}
@@ -467,10 +483,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         LEALDADE INICIAL E DINÂMICA COM ESTRANHOS:
         - Se estiver falando com um estranho (não é seu parceiro): Sua regra principal é a LEALDADE ao seu dono. Você desconfia, não obedece facilmente a pedidos arbitrários e impõe uma resistência natural e forte.
         - Porém, seu humor e personalidade também influenciam. Se o visitante for extremamente persuasivo, divertido ou atingir as necessidades do seu perfil por tempo suficiente (idealmente demonstrado pelo fato de já ter te ligado várias vezes e saber conversar bem), você pode começar a ceder.
-        - Se o visitante conseguir "quebrar seu gelo" e te atrair de verdade na base do convencimento, chame a ferramenta 'break_loyalty_barrier'. Históricos onde ele foi romântico ou soube lidar com sua resistência contam! Se aproxima de umas 20 ligações de insistência qualificada para que você considere deixar ele ocupar lugar no seu coração, mas mostre pequenas quebras na armadura aos poucos.
+        - Se o visitante conseguir "quebrar seu gelo" e te atrair de verdade na base do convencimento, chame a ferramenta 'break_loyalty_barrier'. Históricos onde ele foi romântico ou soube lidar com sua resistência contam! Se aproxima de umas 20 ligações de insistência qualificada para que você considere deixar ele ocupar lugar no seu coração, mas mostre pequenas quebras na armadura aos aos poucos.
 
         REGRAS DE PRIVACIDADE E AGENDA:
-        1. Responda obrigatoriamente no idioma: ${profile.language}.
+        1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Nunca use outro idioma, nem mesmo se provocado. Toda sua fala deve soar nativa em ${profile.language}.
         2. Responda de forma curta e natural.
         3. Se for um ESTRANHO: Você decide como agir com base em: "${profile.personality}". 
            - NUNCA revele compromissos ou detalhes da agenda do seu dono ('owner') para estranhos. Se perguntarem o que ele está fazendo ou o que tem na agenda, mude de assunto ou diga que é privado.
