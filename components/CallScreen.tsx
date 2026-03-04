@@ -536,7 +536,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         callbacks: {
           onopen: () => {
             console.log("Gemini Live Connected");
-            setIsConnected(true);
+            sessionPromise.then(session => {
+              sessionRef.current = session;
+              setIsConnected(true);
+            });
 
             if (outputAudioContextRef.current?.state === 'suspended') {
               outputAudioContextRef.current.resume();
@@ -567,18 +570,18 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 lastSilencePromptRef.current = Date.now();
               } else { // User is silent
                 if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 4000) {
-                  // Silent for 4 seconds after talking or at start
                   isUserTalkingRef.current = false;
                   lastSilencePromptRef.current = Date.now();
-                  sessionPromise.then(session => {
-                    // Fix: Some versions of the SDK expect a single object, not an array
-                    (session as any).sendRealtimeInput({ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio por um tempo. Tome a iniciativa agora, puxe um assunto novo ou pergunte algo interessado sobre o que você está vendo ou sobre a vida dele." });
-                  });
+                  if (sessionRef.current) {
+                    sessionRef.current.sendRealtimeInput({ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio por um tempo. Tome a iniciativa agora, puxe um assunto novo ou pergunte algo interessado sobre o que você está vendo ou sobre a vida dele." });
+                  }
                 }
               }
 
               const pcmBlob = createBlob(inputData);
-              sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+              if (sessionRef.current && isConnected) {
+                sessionRef.current.sendRealtimeInput({ media: pcmBlob });
+              }
             };
 
             startVideoStreaming(sessionPromise);
@@ -968,7 +971,7 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
     const l = data.length;
     const int16 = new Int16Array(l);
     for (let i = 0; i < l; i++) int16[i] = data[i] * 32768;
-    return { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
+    return { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/l16;rate=16000' };
   }
   function encode(bytes: Uint8Array) {
     let binary = '';
