@@ -550,23 +550,42 @@ function App() {
   }, [user, activeCallId]);
 
   const evaluateAiDecision = async (call: any) => {
-    if (call.target_id === user?.id && call.caller_id === user?.id) {
-      // Always accept self-calls for testing/own AI interaction
-      return true;
-    }
-
     const p = profile.personality.toLowerCase();
 
-    // Trait-based Decisions (Probability adjustments)
+    // 1. Explicit User Instructions
+    if (p.includes("sempre rejeitar") || p.includes("não atenda estranhos")) return false;
+    if (p.includes("sempre atender") || p.includes("atenda tudo")) return true;
+
+    // 2. Trait-based Decisions
     if (p.includes("fria") || p.includes("distante")) {
-      return Math.random() > 0.3; // 70% chance (increased from 40 for better UX)
+      return Math.random() > 0.6; // 40% chance
     }
 
     if (p.includes("ciumenta") || p.includes("possessiva")) {
-      if (call.caller_id !== user?.id) return Math.random() > 0.6;
+      // Might only answer if it's the partner
+      if (call.caller_id !== user.id) return Math.random() > 0.8; // Rarely answers strangers
     }
 
-    return true;
+    // 3. Status/Relationship Score
+    if (profile.relationshipScore < 20) return Math.random() > 0.5;
+
+    // 4. Outbound call logic (Adaptive: AI is harder to reach if the user is a refuser)
+    if (call.target_id === user.id && call.caller_id === user.id) {
+      // user calling own AI
+      let chanceOfDeclining = 0.25; // 25% baseline
+
+      // If user refused 2 or more times today, AI becomes "harder" (50% chance of declining)
+      if ((profile.dailyRefusalCount || 0) >= 2) {
+        chanceOfDeclining = 0.50;
+      }
+
+      if (Math.random() < chanceOfDeclining) {
+        console.log("AI decidiu não atender para fazer o usuário sentir falta.");
+        return false;
+      }
+    }
+
+    return true; // Pick up by default
   };
 
   const handleCancelOutbound = async () => {

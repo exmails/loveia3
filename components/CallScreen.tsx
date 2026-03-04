@@ -511,7 +511,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
       const needsTranslation = captionsEnabled && captionLang !== profile.language;
 
       const config = {
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -1052,31 +1052,10 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
         <div className={`flex-1 min-h-[40vh] md:min-h-0 relative transition-all ${isDark ? 'bg-black border-b md:border-b-0 md:border-r border-white/5 shadow-2xl z-10' : 'bg-slate-100 border-b md:border-b-0 md:border-r border-slate-200 shadow-inner'}`}>
           <video ref={videoRef} muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
 
-          {/* AI CAPTIONS OVER VIDEO - Contact Format Pill */}
-          {profile.captionsEnabled && captionText && (
-            <div className="absolute bottom-24 left-0 right-0 px-4 z-50 pointer-events-none flex justify-center">
-              <div className="bg-black/80 backdrop-blur-2xl text-white pl-2 pr-6 py-2 rounded-full shadow-[0_20px_40px_rgba(0,0,0,0.6)] border border-white/20 max-w-[95%] flex items-center gap-3 animate-in fade-in zoom-in-95 duration-500 ring-2 ring-white/10">
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-white/20 flex-shrink-0">
-                  {profile.image ? (
-                    <img src={profile.image} className="w-full h-full object-cover" alt="AI Avatar" />
-                  ) : (
-                    <div className="w-full h-full bg-blue-500/20 flex items-center justify-center text-xl">⚡</div>
-                  )}
-                </div>
-                <div className="flex flex-col items-start overflow-hidden">
-                  <p className="text-[9px] font-black uppercase tracking-widest opacity-40 mb-0.5">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag} {profile.name}</p>
-                  <p className="text-sm sm:text-base font-bold leading-tight tracking-tight text-white line-clamp-2">
-                    {captionText}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* CC Indicator Badge (Bottom Right of Camera) */}
           {profile.captionsEnabled && !captionText && (
             <div className="absolute bottom-6 right-6 z-20 pointer-events-none">
-              <span className="bg-black/50 backdrop-blur-md text-white/40 text-[9px] font-black px-2 py-1 rounded-xl tracking-widest border border-white/5">CC ACTIVE</span>
+              <span className="bg-black/50 backdrop-blur-md text-white/40 text-[9px] font-black px-2 py-1 rounded-xl tracking-widest border border-white/5 uppercase tracking-[0.2em] animate-pulse">CC Ativo</span>
             </div>
           )}
 
@@ -1128,6 +1107,22 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
 
 
 
+      {/* GLOBAL TOP-LEVEL CAPTIONS - Centered at the bottom over everything */}
+      {profile.captionsEnabled && captionText && (
+        <div className="fixed bottom-28 left-0 right-0 px-4 sm:px-10 z-[1000] pointer-events-none flex justify-center">
+          <div className="bg-black/80 backdrop-blur-2xl text-white px-6 py-4 rounded-3xl shadow-[0_30px_60px_-12px_rgba(0,0,0,0.8)] border border-white/20 max-w-3xl w-full text-center animate-in fade-in slide-in-from-bottom-6 duration-500 scale-100 ring-1 ring-white/10">
+            <div className="flex items-center justify-center gap-3 mb-1">
+              <span className="bg-white/10 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-[0.2em] text-white/40 border border-white/5">Transmissão Direta</span>
+              <span className="text-xs">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
+            </div>
+            <p className="text-sm sm:text-lg md:text-xl font-bold leading-snug tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">
+              {captionText}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Control Buttons Layer */}
       <div className="absolute top-28 left-1/2 transform -translate-x-1/2 flex items-center gap-6 sm:gap-12 z-[100] pointer-events-auto">
         <button
           onClick={requestAdvice}
