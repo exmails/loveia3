@@ -187,8 +187,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
     setCaptionText(text.trim());
     captionTimerRef.current = window.setTimeout(() => {
       setCaptionText('');
-      captionBufferRef.current = '';
-    }, 6000);
+    }, 8000);
   };
 
   // Translate via Gemini generateContent (lightweight text call)
@@ -511,7 +510,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
       const needsTranslation = captionsEnabled && captionLang !== profile.language;
 
       const config = {
-        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        model: 'gemini-2.0-flash-exp',
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -1053,12 +1052,21 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
           <video ref={videoRef} muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
 
           {/* AI CAPTIONS OVER VIDEO - Positioned above local camera badge */}
-          {profile.captionsEnabled && captionText && (
-            <div className="absolute bottom-24 left-0 right-0 px-4 z-50 pointer-events-none flex justify-center">
-              <div className="bg-black/70 backdrop-blur-2xl text-white px-5 py-2.5 rounded-2xl shadow-[0_20px_40px_rgba(0,0,0,0.6)] border border-white/20 max-w-[95%] text-center animate-in fade-in zoom-in-95 duration-500 scale-100 sm:scale-110 ring-2 ring-white/10">
-                <p className="text-xs sm:text-base font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,1)]">
-                  <span className="opacity-60 mr-2 text-[10px] font-bold">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
-                  {captionText}
+          {profile.captionsEnabled && (captionText || !isConnected) && (
+            <div className="absolute bottom-[20%] left-0 right-0 px-6 z-[100] pointer-events-none flex justify-center">
+              <div className="bg-black/80 backdrop-blur-3xl text-white px-8 py-4 rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.8)] border border-white/20 max-w-[90%] text-center animate-in fade-in zoom-in-95 duration-500 ring-2 ring-white/10">
+                <p className="text-base sm:text-lg font-black leading-snug tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                  {!isConnected ? (
+                    <span className="flex items-center gap-3 justify-center text-blue-400">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+                      CONECTANDO IA...
+                    </span>
+                  ) : (
+                    <>
+                      <span className="opacity-60 mr-3 text-sm">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
+                      {captionText}
+                    </>
+                  )}
                 </p>
               </div>
             </div>
