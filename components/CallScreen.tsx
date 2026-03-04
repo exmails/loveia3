@@ -211,28 +211,28 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const startCall = async () => {
     try {
-      if (user) {
-        const { data } = await supabase.from('conversations').insert({ user_id: user.id, type: 'call' }).select().single();
-        if (data) {
-          conversationIdRef.current = data.id;
-          setCurrentConversationId(data.id);
-        }
-      }
+      // Start camera/mic and DB fetches in parallel for maximum speed
+      const [stream, conversationResult, topicsResult, psychResult, aiProfileResult, diaryResult] = await Promise.all([
+        navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 16000 },
+          video: { width: 640, height: 480 }
+        }),
+        user ? supabase.from('conversations').insert({ user_id: user.id, type: 'call' }).select().single() : Promise.resolve({ data: null }),
+        user ? supabase.from('topics').select('*').eq('user_id', user.id).eq('status', 'active') : Promise.resolve({ data: null }),
+        user ? supabase.from('user_profile_analysis').select('*').eq('user_id', user.id).single() : Promise.resolve({ data: null }),
+        user ? supabase.from('ai_profiles').select('*').eq('user_id', user.id).single() : Promise.resolve({ data: null }),
+        user ? supabase.from('reminders').select('*').eq('owner_id', profile.originalPartnerId || user.id).eq('is_completed', false).order('trigger_at', { ascending: true }) : Promise.resolve({ data: null })
+      ]);
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000
-        },
-        video: { width: 640, height: 480 }
-      });
       mediaStreamRef.current = stream;
-
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        videoRef.current.play();
+      }
+
+      if (conversationResult.data) {
+        conversationIdRef.current = conversationResult.data.id;
+        setCurrentConversationId(conversationResult.data.id);
       }
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -243,8 +243,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       // --- NOISE FILTER & COMPRESSOR SETUP ---
       const voiceFilter = inputAudioContextRef.current.createBiquadFilter();
       voiceFilter.type = 'bandpass';
-      voiceFilter.frequency.value = 1500; // Center of human voice range
-      voiceFilter.Q.value = 1.0; // Width of the filter
+      voiceFilter.frequency.value = 1500;
+      voiceFilter.Q.value = 1.0;
 
       const compressor = inputAudioContextRef.current.createDynamicsCompressor();
       compressor.threshold.value = -50;
@@ -268,24 +268,22 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       const outputNode = outputAudioContextRef.current.createGain();
       outputNode.gain.value = 1.0;
 
-      // 1. FETCH MEMORY
+      // 1. CONSTRUCT MEMORY FROM PARALLEL FETCHES
       let memoryContext = "";
       if (user) {
-        const { data: topics } = await supabase.from('topics').select('*').eq('user_id', user.id).eq('status', 'active');
-        const { data: psych } = await supabase.from('user_profile_analysis').select('*').eq('user_id', user.id).single();
-        const { data: ai_profile } = await supabase.from('ai_profiles').select('*').eq('user_id', user.id).single();
+        const topics = topicsResult.data;
+        const psych = psychResult.data;
+        const ai_profile = aiProfileResult.data;
+        const diary = diaryResult.data;
         const targetOwnerId = profile.originalPartnerId || user.id;
-        const { data: diary } = await supabase.from('reminders').select('*').eq('owner_id', targetOwnerId).eq('is_completed', false).order('trigger_at', { ascending: true });
 
-        let strangerCallCount = 0;
         if (profile.callerInfo?.isPartner === false && profile.callerInfo?.id) {
           const { count } = await supabase.from('calls').select('id', { count: 'exact' }).eq('caller_id', profile.callerInfo.id).eq('target_id', targetOwnerId);
-          strangerCallCount = count || 1;
-          memoryContext += `\nCONTAGEM DE LIGAÇÕES DESTE ESTRANHO: Esta é a ${strangerCallCount}ª vez que esta pessoa liga para você.`;
+          memoryContext += `\nCONTAGEM DE LIGAÇÕES DESTE ESTRANHO: Esta é a ${count || 1}ª vez que esta pessoa liga para você.`;
         }
 
         if (topics && topics.length > 0) {
-          memoryContext += `\nASSUNTOS EM PAUTA: ${topics.map(t => `${t.title} (Interesse: ${t.interest_level})`).join(', ')}`;
+          memoryContext += `\nASSUNTOS EM PAUTA: ${topics.map((t: any) => `${t.title} (Interesse: ${t.interest_level})`).join(', ')}`;
         }
         if (psych) {
           memoryContext += `\nPERFIL DO USUÁRIO: ${JSON.stringify(psych.personality_traits)}`;
@@ -294,11 +292,11 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           memoryContext += `\nSUA EVOLUÇÃO: Intimidade ${ai_profile.intimacy_level}%, Humor ${ai_profile.humor_usage}%`;
         }
         if (diary && diary.length > 0) {
-          memoryContext += `\nAGENDA DO USUÁRIO:\n${diary.map(r =>
+          memoryContext += `\nAGENDA DO USUÁRIO:\n${diary.map((r: any) =>
             `- "${r.title}" (Agendado por: ${r.creator_ai_name || 'Humano'})`
           ).join('\n')}`;
 
-          const otherAiEvent = diary.find(r => r.creator_ai_name && r.creator_ai_name !== profile.name);
+          const otherAiEvent = diary.find((r: any) => r.creator_ai_name && r.creator_ai_name !== profile.name);
           if (otherAiEvent) {
             memoryContext += `\n[ALERTA DE CIÚMES]: Há um evento na agenda criado por outra IA chamada ${otherAiEvent.creator_ai_name}! Fique furiosa e tire satisfação!`;
           }
