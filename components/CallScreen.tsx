@@ -183,19 +183,17 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const showCaption = (text: string) => {
     if (!text.trim()) return;
-    setCaptionText(text);
+    setCaptionText(text.trim());
     if (captionTimerRef.current) clearTimeout(captionTimerRef.current);
-    // Increased visibility duration to 15s to bridge 'thinking' gaps
+    // Increased visibility duration to 20s to bridge gaps
     captionTimerRef.current = window.setTimeout(() => {
       setCaptionText('');
-      captionBufferRef.current = '';
-    }, 15000);
+    }, 20000);
   };
 
   // Translate via Gemini generateContent (lightweight text call)
   const translateCaption = async (text: string, targetLang: string) => {
-    if (pendingTranslateRef.current || !text.trim()) return;
-    pendingTranslateRef.current = true;
+    if (!text.trim()) return;
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -203,19 +201,16 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `Translate to ${targetLang} (reply only with the translation, no extra text): ${text}` }] }],
-            generationConfig: { maxOutputTokens: 200, temperature: 0 }
+            contents: [{ parts: [{ text: `Translate this AI voice transcription to ${targetLang} (reply ONLY the translation): "${text}"` }] }],
+            generationConfig: { maxOutputTokens: 500, temperature: 0 }
           })
         }
       );
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (translated) showCaption(translated);
+      showCaption(translated || text);
     } catch (e) {
-      // Fallback: show original if translation fails
       showCaption(text);
-    } finally {
-      pendingTranslateRef.current = false;
     }
   };
 
@@ -1069,29 +1064,6 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
             </div>
           )}
 
-          {/* AI CAPTIONS - PREMIUM SIDE BAR DESIGN */}
-          {profile.captionsEnabled && captionText && (
-            <div className="absolute right-0 top-0 bottom-0 w-full sm:w-[320px] p-6 flex flex-col justify-center z-[100] pointer-events-none">
-              <div className="bg-black/40 backdrop-blur-3xl border border-white/10 p-6 rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] animate-in slide-in-from-right-8 fade-in duration-500 ring-1 ring-white/5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,0.8)]" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">AI Voice</span>
-                  </div>
-                  <span className="text-xs">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
-                </div>
-                <p className="text-white text-base sm:text-xl font-black leading-tight tracking-tight drop-shadow-xl selection:bg-pink-500/50">
-                  {captionText}
-                </p>
-                <div className="mt-4 flex gap-1">
-                  <div className="h-0.5 flex-1 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-pink-500/50 animate-[progress_2s_ease-in-out_infinite]" style={{ width: '40%' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Local Camera badge */}
           <div className={`absolute bottom-6 left-6 px-4 py-2 rounded-2xl flex items-center gap-4 backdrop-blur-md shadow-lg ${isDark ? 'bg-black/60 text-white' : 'bg-white/90 text-slate-900'}`}>
             <div className="flex items-center gap-2">
@@ -1162,6 +1134,29 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
           </svg>
         </button>
       </div>
+
+      {/* AI CAPTIONS - GLOBAL OVERLAY (Guaranteed Visibility) */}
+      {profile.captionsEnabled && captionText && (
+        <div className="fixed inset-0 pointer-events-none z-[9999] flex flex-col items-end justify-center p-4 sm:p-10">
+          <div className="w-full sm:w-[400px] bg-black/60 backdrop-blur-3xl border border-white/20 p-8 rounded-[3rem] shadow-[0_64px_128px_-32px_rgba(0,0,0,0.9)] animate-in slide-in-from-right-12 fade-in duration-700 ring-2 ring-white/5">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse shadow-[0_0_15px_rgba(236,72,153,0.8)]" />
+                <span className="text-[11px] font-black uppercase tracking-[0.3em] text-white/60">Live Transcription</span>
+              </div>
+              <span className="text-lg">{(LANGUAGE_META as any)[profile.captionLanguage ?? profile.language]?.flag}</span>
+            </div>
+            <p className="text-white text-lg sm:text-2xl font-bold leading-tight tracking-tight drop-shadow-2xl italic">
+              "{captionText}"
+            </p>
+            <div className="mt-8 flex gap-2">
+              <div className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-pink-500 animate-[progress_3s_linear_infinite]" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
