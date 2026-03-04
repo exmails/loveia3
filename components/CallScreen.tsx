@@ -183,12 +183,13 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const showCaption = (text: string) => {
     if (!text.trim()) return;
+    setCaptionText(text);
     if (captionTimerRef.current) clearTimeout(captionTimerRef.current);
-    setCaptionText(text.trim());
+    // Increased visibility duration to 15s to bridge 'thinking' gaps
     captionTimerRef.current = window.setTimeout(() => {
       setCaptionText('');
       captionBufferRef.current = '';
-    }, 6000);
+    }, 15000);
   };
 
   // Translate via Gemini generateContent (lightweight text call)
@@ -1023,6 +1024,12 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
 
   return (
     <div className={`h-screen w-full flex flex-col overflow-hidden relative ${isDark ? 'bg-[#0b0c10]' : 'bg-[#f4f7fa]'}`}>
+      <style>{`
+        @keyframes progress {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(250%); }
+        }
+      `}</style>
       <canvas ref={canvasRef} className="hidden" />
 
       <div className="absolute top-0 left-0 w-full p-4 sm:p-6 z-20 flex flex-col sm:flex-row justify-between items-start gap-4 pointer-events-none">
