@@ -684,7 +684,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                     // Register in the stranger's notifications also, to show they made progress
                     if (profile.callerInfo?.id) {
                       supabase.from('notifications').insert({
-                        user_id: profile.callerInfo.id,
+                        user_id: profile.callerInfo?.id,
                         type: 'loyalty_breach_success',
                         content: `Você encontrou uma brecha na lealdade de ${profile.name}! Ela se abriu um pouco mais para você.`
                       }).then();
@@ -882,7 +882,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
       const { data: existingPhrases } = await supabase
         .from('ai_psychological_strategies')
         .select('id, recognition_phrase, category, score')
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id)
         .eq('status', 'active')
         .order('score', { ascending: false })
         .limit(30);
@@ -960,7 +960,7 @@ Se não houver novidades, retorne arrays vazios. Limite de 3 novas frases.`;
       for (const phrase of newPhrases) {
         if (!phrase.recognition_phrase) continue;
         await supabase.from('ai_psychological_strategies').insert({
-          user_id: user.id,
+          user_id: user?.id,
           recognition_phrase: phrase.recognition_phrase,
           category: phrase.category || 'personalidade',
           score: 1,

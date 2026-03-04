@@ -563,14 +563,14 @@ function App() {
 
     if (p.includes("ciumenta") || p.includes("possessiva")) {
       // Might only answer if it's the partner
-      if (call.caller_id !== user.id) return Math.random() > 0.8; // Rarely answers strangers
+      if (user && call.caller_id !== user.id) return Math.random() > 0.8; // Rarely answers strangers
     }
 
     // 3. Status/Relationship Score
     if (profile.relationshipScore < 20) return Math.random() > 0.5;
 
     // 4. Outbound call logic (Adaptive: AI is harder to reach if the user is a refuser)
-    if (call.target_id === user.id && call.caller_id === user.id) {
+    if (user && call.target_id === user.id && call.caller_id === user.id) {
       // user calling own AI
       let chanceOfDeclining = 0.25; // 25% baseline
 
