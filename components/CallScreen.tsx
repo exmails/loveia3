@@ -216,7 +216,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `Translate this AI voice transcription to ${langName} (reply ONLY the translation): "${text}"` }] }],
+            contents: [{ parts: [{ text: `Translate this AI voice transcription into ${langName}. Remove any internal reasoning, tool logs, or [meta-text]. Return ONLY the translated speech. Text: "${text}"` }] }],
             generationConfig: { maxOutputTokens: 500, temperature: 0 }
           })
         }
@@ -226,6 +226,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       // Remove quotes if the AI added them
       const cleaned = translated?.replace(/^["']|["']$/g, '');
       console.log(`[Translation] Result: "${cleaned?.substring(0, 30)}..."`);
+
+      // If the translation failed or returned exactly the same junk, we try to at least show something
       showCaption(cleaned || translated || text);
     } catch (e) {
       console.error('[Translation] Error:', e);
@@ -490,7 +492,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
 
         REGRAS DE PRIVACIDADE E AGENDA:
         1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Nunca use outro idioma em sua fala, nem mesmo se provocado ou se o usuário falar outra língua. Toda sua fala, transcrição, pensamentos e descrições de contexto devem ser gerados diretamente em ${profile.language}.
-        2. Jamais envie textos em Inglês para o sistema de transcrição ou visão. Se você estiver interpretando o que vê pela câmera, descreva isso apenas em ${profile.language}.
+        2. NUNCA gere ou envie textos explicativos, "pensamentos" ou "internal reasoning" como parte da sua resposta de texto. Sua saída de texto deve ser EXCLUSIVAMENTE a transcrição do que você está falando em áudio. Bloqueie qualquer saída que descreva suas ações entre asteriscos ou colchetes. Jamais envie textos em Inglês para o sistema de transcrição ou visão.
         3. Responda de forma curta e natural.
         4. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
         5. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
@@ -772,13 +774,15 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             const transcriptChunk = (message.serverContent as any)?.outputAudioTranscription?.text || (message.serverContent as any)?.outputTranscription?.text;
             const isFinished = (message.serverContent as any)?.outputAudioTranscription?.finished || (message.serverContent as any)?.outputTranscription?.finished;
 
-            // FALLBACK: modelTurn text parts (older API / unsupported models)
+            // FALLBACK: Only use modelTurn text parts if outputAudioTranscription is NOT sending any text.
+            // This prevents "reasoning" text from being mixed with actual spoken dialogue.
+            const hasOfficialTranscript = typeof transcriptChunk === 'string' && transcriptChunk.length > 0;
             const fallbackText = allParts
               .filter((p: any) => typeof p?.text === 'string' && p.text.trim())
               .map((p: any) => p.text as string)
               .join('');
 
-            const rawCaption = transcriptChunk ?? fallbackText;
+            const rawCaption = hasOfficialTranscript ? transcriptChunk : (transcriptChunk === undefined ? fallbackText : "");
 
             if (rawCaption) {
               captionBufferRef.current += rawCaption;
