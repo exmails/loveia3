@@ -220,7 +220,12 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000
+        },
         video: { width: 640, height: 480 }
       });
       mediaStreamRef.current = stream;
@@ -234,8 +239,22 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
       // --- INPUT SETUP ---
       inputAudioContextRef.current = new AudioContextClass({ sampleRate: 16000 });
+
+      // --- NOISE FILTER & COMPRESSOR SETUP ---
+      const voiceFilter = inputAudioContextRef.current.createBiquadFilter();
+      voiceFilter.type = 'bandpass';
+      voiceFilter.frequency.value = 1500; // Center of human voice range
+      voiceFilter.Q.value = 1.0; // Width of the filter
+
+      const compressor = inputAudioContextRef.current.createDynamicsCompressor();
+      compressor.threshold.value = -50;
+      compressor.knee.value = 40;
+      compressor.ratio.value = 12;
+      compressor.attack.value = 0;
+      compressor.release.value = 0.25;
+
       const userAnalyser = inputAudioContextRef.current.createAnalyser();
-      userAnalyser.fftSize = 64; // Small size for simple volume check
+      userAnalyser.fftSize = 64;
       userAnalyser.smoothingTimeConstant = 0.5;
       userAnalyserRef.current = userAnalyser;
 
@@ -501,7 +520,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
       const needsTranslation = captionsEnabled && captionLang !== profile.language;
 
       const config = {
-        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        model: 'gemini-2.0-flash',
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -528,10 +547,12 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             if (!inputAudioContextRef.current || !stream || !userAnalyserRef.current) return;
 
             const source = inputAudioContextRef.current.createMediaStreamSource(stream);
-            const scriptProcessor = inputAudioContextRef.current.createScriptProcessor(4096, 1, 1);
+            const scriptProcessor = inputAudioContextRef.current.createScriptProcessor(2048, 1, 1);
 
-            // Chain: Source -> User Analyser -> ScriptProcessor -> Destination
-            source.connect(userAnalyserRef.current);
+            // Chain: Source -> Voice Filter -> Compressor -> User Analyser -> ScriptProcessor -> Destination
+            source.connect(voiceFilter);
+            voiceFilter.connect(compressor);
+            compressor.connect(userAnalyserRef.current);
             userAnalyserRef.current.connect(scriptProcessor);
             scriptProcessor.connect(inputAudioContextRef.current.destination);
 
@@ -547,12 +568,13 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 isUserTalkingRef.current = true;
                 lastSilencePromptRef.current = Date.now();
               } else { // User is silent
-                if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 7000) {
-                  // Silent for 7 seconds after talking or at start
+                if (isUserTalkingRef.current && Date.now() - lastSilencePromptRef.current > 4000) {
+                  // Silent for 4 seconds after talking or at start
                   isUserTalkingRef.current = false;
                   lastSilencePromptRef.current = Date.now();
                   sessionPromise.then(session => {
-                    session.sendRealtimeInput([{ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio por um tempo. Tome a iniciativa agora, puxe um assunto novo ou pergunte algo interessado sobre o que você está vendo ou sobre a vida dele." }]);
+                    // Fix: Some versions of the SDK expect a single object, not an array
+                    (session as any).sendRealtimeInput({ text: "[SILÊNCIO DETECTADO]: O usuário está em silêncio por um tempo. Tome a iniciativa agora, puxe um assunto novo ou pergunte algo interessado sobre o que você está vendo ou sobre a vida dele." });
                   });
                 }
               }
@@ -566,11 +588,11 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             // Initial engagement trigger
             setTimeout(() => {
               sessionPromise.then(session => {
-                session.sendRealtimeInput([{
+                (session as any).sendRealtimeInput({
                   text: "Oi! Acabei de conectar. Observe o que estou fazendo pela câmera e comece a conversa você mesma, puxando assunto sobre algo que viu ou me perguntando como foi meu dia. Não espere eu falar nada."
-                }]);
+                });
               });
-            }, 1500);
+            }, 1000);
           },
           onmessage: async (message: LiveServerMessage) => {
             if (message.toolCall) {
