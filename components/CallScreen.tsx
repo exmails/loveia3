@@ -897,25 +897,25 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   pendingTranslationTimerRef.current = null;
                 }
 
-                // PRIORITY 1: Try to extract [[LEGENDA:]] from AI text channel (same-language captions)
-                const legendaMatch = textChannelText.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
-                if (legendaMatch && legendaMatch[1]?.trim()) {
-                  console.log(`[Captions] ✅ Using [[LEGENDA:]] from text channel directly.`);
-                  showCaption(legendaMatch[1].trim());
-                  lastKoreanTextRef.current = '';
-                } else if (captionLang !== profile.language) {
-                  // PRIORITY 2: Different language — translate the audio transcript.
-                  // Use fullAiText (from captionBufferRef) OR lastKoreanTextRef as fallback
-                  // (lastKoreanTextRef has the accumulated interim text if isTurnFinished fired early)
+                // PRIORITY 1: If languages differ, we MUST translate the audio transcript.
+                if (captionLang !== profile.language) {
                   const textToTranslate = fullAiText || lastKoreanTextRef.current;
                   lastKoreanTextRef.current = '';
                   if (textToTranslate) {
-                    console.log(`[Captions] ⚠️ Translating to ${captionLang}: "${textToTranslate.substring(0, 30)}..."`);
+                    console.log(`[Captions] ⚠️ Translating turn to ${captionLang}: "${textToTranslate.substring(0, 30)}..."`);
                     translateCaption(textToTranslate, captionLang);
                   }
                 } else {
-                  // PRIORITY 3: Same language — just show the audio transcript (stripped)
-                  showCaption(fullAiText || textChannelText);
+                  // PRIORITY 2: Same language. Try text channel first, then raw audio transcript
+                  const legendaMatch = textChannelText.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
+                  if (legendaMatch && legendaMatch[1]?.trim()) {
+                    console.log(`[Captions] ✅ Using [[LEGENDA:]] from text channel directly.`);
+                    showCaption(legendaMatch[1].trim());
+                  } else {
+                    // Fallback to audio transcript (stripped of thinking tags)
+                    showCaption(fullAiText || textChannelText);
+                  }
+                  lastKoreanTextRef.current = '';
                 }
 
                 // Vision engagement: If 8 seconds pass after AI finishes and user hasn't talked
