@@ -195,10 +195,20 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   };
 
   const showCaption = (text: string) => {
-    if (!text.trim()) return;
-    setCaptionText(text.trim());
+    if (!text) return;
+    // Clean up any AI reasoning artifacts like **thoughts**, [context], or technical logs
+    const cleaned = text
+      .replace(/\*\*.*?\*\*/g, '') // Remove **bold reasoning**
+      .replace(/\[.*?\]/g, '')     // Remove [bracketed notes]
+      .replace(/\{.*?\}/g, '')     // Remove {json/curly}
+      .replace(/Thought:|Context:|Reasoning:|Internal:|Observation:|Inference:/gi, '')
+      .replace(/\n+/g, ' ')        // Normalizar quebras de linha
+      .trim();
+
+    if (!cleaned) return;
+
+    setCaptionText(cleaned);
     if (captionTimerRef.current) clearTimeout(captionTimerRef.current);
-    // Increased visibility duration to 20s to bridge gaps
     captionTimerRef.current = window.setTimeout(() => {
       setCaptionText('');
     }, 20000);
@@ -774,21 +784,16 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             const transcriptChunk = (message.serverContent as any)?.outputAudioTranscription?.text || (message.serverContent as any)?.outputTranscription?.text;
             const isFinished = (message.serverContent as any)?.outputAudioTranscription?.finished || (message.serverContent as any)?.outputTranscription?.finished;
 
-            // FALLBACK: Only use modelTurn text parts if outputAudioTranscription is NOT sending any text.
-            // This prevents "reasoning" text from being mixed with actual spoken dialogue.
-            const hasOfficialTranscript = typeof transcriptChunk === 'string' && transcriptChunk.length > 0;
-            const fallbackText = allParts
-              .filter((p: any) => typeof p?.text === 'string' && p.text.trim())
-              .map((p: any) => p.text as string)
-              .join('');
-
-            const rawCaption = hasOfficialTranscript ? transcriptChunk : (transcriptChunk === undefined ? fallbackText : "");
+            // CRITICAL: We EXCLUSIVELY use the official transcription stream.
+            // The 'allParts' / 'fallbackText' logic often contains AI "Internal Reasoning" (like **Thinking...**)
+            // which we want to keep hidden from the user.
+            const rawCaption = transcriptChunk || "";
 
             if (rawCaption) {
               captionBufferRef.current += rawCaption;
             }
 
-            if ((isFinished || (!transcriptChunk && fallbackText)) && captionBufferRef.current.trim()) {
+            if (isFinished && captionBufferRef.current.trim()) {
               const fullAiText = captionBufferRef.current.trim();
               captionBufferRef.current = '';
 
