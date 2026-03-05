@@ -204,13 +204,18 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
     alert("Fale agora: 'Preciso de um conselho' - A IA vai detectar sua entonação.");
   };
 
-  const showCaption = (text: string) => {
+  const showCaption = (text: string, isFromTranslation: boolean = false) => {
     if (!text) return;
 
-    // IMPORTANT: If we are in translation mode (captionLang !== profile.language),
-    // we should only be calling this function with the ALREADY translated text
-    // from translateCaption, or a loading state like '⏳...'.
-    // If we call it with raw text accidentally, stripReasoning acts as a safety.
+    // PROTECTION: If we expect a translation but this call came from a raw source, block it.
+    // This prevents Portuguese from appearing when English is selected.
+    const p = profileRef.current;
+    const captionLang = p.captionLanguage ?? p.language;
+    if (captionLang !== p.language && !isFromTranslation && text !== '⏳...') {
+      console.warn(`[Captions] 🚫 Blocking raw text leak: "${text.substring(0, 30)}..." (Expected: ${captionLang})`);
+      return;
+    }
+
     const cleaned = stripReasoning(text);
     if (!cleaned) return;
 
@@ -246,11 +251,13 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const translateCaption = async (fullText: string, targetLang: string) => {
     if (!fullText.trim()) return;
 
-    const currentProfile = profileRef.current;
-    const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
-    console.log(`[Translation] 🌐 From ${currentProfile.language} to ${langName} | Text: "${fullText.substring(0, 40)}..."`);
+    const p = profileRef.current;
+    const fromLang = (LANGUAGE_NAME_MAP as any)[p.language] || p.language;
+    const toLang = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
 
-    // Show a subtle loading indicator
+    console.log(`[Translation] 🌐 Translating Turn: ${fromLang} → ${toLang}`);
+
+    // Show a loading state
     setCaptionText('⏳...');
 
     try {
@@ -262,30 +269,29 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `Translate the following spoken text from ${currentProfile.language} into ${langName}. 
-                Return ONLY the translated text, nothing else. No explanations, no preamble. 
-                If the input is already in ${langName}, return it as is but ensure it is natural.
-                Input text: ${fullText}`
+                text: `Task: Translate this spoken dialogue from ${fromLang} to ${toLang}.
+                Return ONLY the direct ${toLang} translation. NO thoughts, NO meta-text, NO explanation.
+                Input (${fromLang}): ${fullText}`
               }]
             }],
-            generationConfig: { maxOutputTokens: 600, temperature: 0 }
+            generationConfig: { maxOutputTokens: 500, temperature: 0 }
           })
         }
       );
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      const cleaned = translated?.replace(/^[\"']|[\"']$/g, '');
-      console.log(`[Translation] ✅ Result (${langName}): "${cleaned?.substring(0, 50)}..."`);
 
-      if (cleaned) {
-        showCaption(cleaned);
+      if (translated) {
+        const cleaned = translated.replace(/^[\"']|[\"']$/g, '');
+        console.log(`[Translation] ✅ Success: "${cleaned.substring(0, 40)}..."`);
+        showCaption(cleaned, true);
       } else {
-        console.warn('[Translation] ⚠️ Empty result, showing original');
-        showCaption(stripReasoning(fullText));
+        console.error('[Translation] ❌ Failed to get results in JSON:', json);
+        setCaptionText('[Translation Error]');
       }
     } catch (e) {
-      console.error('[Translation] ❌ Error:', e);
-      showCaption(stripReasoning(fullText));
+      console.error('[Translation] ❌ Network Error:', e);
+      setCaptionText('[Network Error]');
     }
   };
 
@@ -913,16 +919,16 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   const textToTranslate = fullAiText || lastKoreanTextRef.current;
                   lastKoreanTextRef.current = '';
                   if (textToTranslate) {
-                    console.log(`[Captions] Turn End: Languages differ (${p.language} -> ${captionLang}). Translating...`);
+                    console.log(`[Captions] 🎌 Turn Finished. Needs translation from ${p.language} to ${captionLang}.`);
                     translateCaption(textToTranslate, captionLang);
                   }
                 } else {
                   // PRIORITY 2: Same language. Try text channel first, then raw audio transcript
                   const legendaMatch = textChannelText.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
                   if (legendaMatch && legendaMatch[1]?.trim()) {
-                    showCaption(legendaMatch[1].trim());
+                    showCaption(legendaMatch[1].trim(), false);
                   } else {
-                    showCaption(fullAiText || textChannelText);
+                    showCaption(fullAiText || textChannelText, false);
                   }
                   lastKoreanTextRef.current = '';
                 }
@@ -960,9 +966,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 // Same language: show audio buffer directly (trying [[LEGENDA:]] first)
                 const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
                 if (interimLegenda && interimLegenda[1]?.trim()) {
-                  showCaption(interimLegenda[1].trim());
+                  showCaption(interimLegenda[1].trim(), false);
                 } else {
-                  showCaption(captionBufferRef.current);
+                  showCaption(captionBufferRef.current, false);
                 }
               } else {
                 // Different language — Debounce translation
