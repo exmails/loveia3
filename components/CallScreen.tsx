@@ -211,8 +211,14 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   // Translate via Gemini generateContent (lightweight text call)
   const stripReasoning = (text: string) => {
     if (!text) return "";
+
+    // Check for explicit [[LEGENDA: ...]] tag first (AI-generated pre-translation)
+    const explicitMatch = text.match(/\[\[LEGENDA:\s*(.*?)\]\]/i);
+    if (explicitMatch && explicitMatch[1]) {
+      return explicitMatch[1].trim();
+    }
+
     // Remove everything starting from common AI reasoning markers if they appear later in the text
-    // Spoken dialogue is usually at the beginning.
     let cleaned = text;
 
     // Markers that usually signify the end of dialogue and start of thinking
@@ -537,10 +543,14 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         - Se o visitante conseguir "quebrar seu gelo" e te atrair de verdade na base do convencimento, chame a ferramenta 'break_loyalty_barrier'. Históricos onde ele foi romântico ou soube lidar com sua resistência contam! Se aproxima de umas 20 ligações de insistência qualificada para que você considere deixar ele ocupar lugar no seu coração, mas mostre pequenas quebras na armadura aos aos poucos.
 
         REGRAS DE PRIVACIDADE E AGENDA:
-        1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Nunca use outro idioma em sua fala, nem mesmo se provocado ou se o usuário falar outra língua. Toda sua fala, transcrição, pensamentos e descrições de contexto devem ser gerados diretamente em ${profile.language}.
-        2. NUNCA gere ou envie textos explicativos, "pensamentos" ou "internal reasoning" como parte da sua resposta de texto audível. Suas reflexões internas e uso de ferramentas devem ser discretos. A saída de texto oficial deve refletir APENAS a fala.
-        3. Se você estiver interpretando o que vê pela câmera, descreva isso apenas em ${profile.language} e apenas como reflexão preliminar à sua fala.
-        4. Responda de forma curta e natural.
+        1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Toda sua fala audível e transcrição natural deve ser em ${profile.language}.
+        2. MODO DE TRADUÇÃO PARA LEGENDAS (CRÍTICO): 
+           - Se o idioma da legenda (${profile.captionLanguage}) for diferente do seu idioma de fala (${profile.language}), você deve SEMPRE iniciar sua resposta de TEXTO escrevendo a tradução do que vai falar.
+           - Formato Obrigatório: [[LEGENDA: <texto traduzido em ${profile.captionLanguage}>]]
+           - Pule uma linha e então comece sua fala audível.
+           - Jamais envie outros pensamentos, raciocínios internos, ações entre asteriscos ou descrições técnicas no canal de texto. O canal de texto serve APENAS para a Legenda e a Transcrição da Fala.
+        3. Responda de forma curta e natural.
+        4. Se você estiver interpretando o que vê pela câmera, use isso apenas para o seu contexto interno de resposta, não descreva isso no texto final.
         5. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
         6. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
         7. HISTÓRICO DE PERSONALIDADE (MUITO IMPORTANTE): Durante a conversa, observe o comportamento do usuário e use 'save_psychological_insight' para registrar frases de reconhecimento. Escreva frases descritivas e específicas na segunda pessoa, como se estivesse descrevendo o usuário: ex: "Você ri quando fica nervoso", "Você costuma ser direto ao pedir algo", "Você demonstra ciúmes quando menciono outras pessoas", "Você parece mais animado de manhã". Salve pelo menos 1 frase por chamada sempre que detectar um padrão claro de comportamento, emoção ou hábito.
