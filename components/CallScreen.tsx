@@ -88,14 +88,6 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const isDark = profile.theme === 'dark';
 
-  const profileRef = useRef(profile);
-  const apiKeyRef = useRef(apiKey);
-
-  useEffect(() => {
-    profileRef.current = profile;
-    apiKeyRef.current = apiKey;
-  }, [profile, apiKey]);
-
   useEffect(() => {
     startCall();
     startVisualizerLoop();
@@ -246,53 +238,44 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   };
 
   const translateCaption = async (fullText: string, targetLang: string) => {
-    // 1. Clean the input: strip any AI tags or reasoning BEFORE sending to translation
-    const pureText = stripReasoning(fullText);
-    if (!pureText.trim()) return;
+    if (!fullText.trim()) return;
 
     const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
-    const sourceLang = (LANGUAGE_NAME_MAP as any)[profileRef.current.language] || profileRef.current.language;
+    console.log(`[Translation] → Translating to "${langName}" (key="${targetLang}"): "${fullText.substring(0, 50)}..."`);
 
-    console.log(`[Translation] 🌐 From ${sourceLang} to ${langName}: "${pureText.substring(0, 40)}..."`);
-
-    // Show a subtle loading indicator
+    // Show a subtle loading indicator while translation is in progress
     setCaptionText('⏳...');
 
     try {
-      // Use gemini-2.0-flash which is extremely fast and reliable for simple tasks
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKeyRef.current}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `Translate this text from ${sourceLang} to ${langName}. Output ONLY the translated text, no extra characters or quotes.\n\nText: ${pureText}`
+                text: `Translate the following spoken text into ${langName}. Return ONLY the translated text, nothing else — no explanations, no quotes, no extra words.\n\nText to translate: ${fullText}`
               }]
             }],
             generationConfig: { maxOutputTokens: 500, temperature: 0 }
           })
         }
       );
-
-      if (!res.ok) {
-        setCaptionText('...'); // Keep dot indicator to show something happened
-        return;
-      }
-
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      const cleaned = translated?.replace(/^[\"']|[\"']$/g, '').trim();
+      const cleaned = translated?.replace(/^[\"']|[\"']$/g, '');
+      console.log(`[Translation] ✅ Result (${langName}): "${cleaned?.substring(0, 50)}..."`);
 
       if (cleaned) {
         showCaption(cleaned);
       } else {
-        setCaptionText('...');
+        console.warn('[Translation] ⚠️ Empty result, showing original');
+        showCaption(stripReasoning(fullText));
       }
     } catch (e) {
       console.error('[Translation] ❌ Error:', e);
-      setCaptionText('...');
+      showCaption(stripReasoning(fullText));
     }
   };
 
@@ -902,10 +885,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
               }
 
               // Display captions if enabled
-              if (profileRef.current.captionsEnabled) {
-                const captionLang = profileRef.current.captionLanguage ?? profileRef.current.language;
+              if (profile.captionsEnabled) {
+                const captionLang = profile.captionLanguage ?? profile.language;
 
-                console.log(`[Captions] Turn finished. AI Lang: ${profileRef.current.language}, Caption Target: ${captionLang}`);
+                console.log(`[Captions] Turn finished. AI Lang: ${profile.language}, Caption Target: ${captionLang}`);
                 console.log(`[Captions] Text channel buffer: "${textChannelText.substring(0, 60)}..."`);
 
                 // Cancel any pending debounced translation — the full turn is done now
@@ -915,7 +898,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 }
 
                 // PRIORITY 1: If languages differ, we MUST translate the audio transcript.
-                if (captionLang !== profileRef.current.language) {
+                if (captionLang !== profile.language) {
                   const textToTranslate = fullAiText || lastKoreanTextRef.current;
                   lastKoreanTextRef.current = '';
                   if (textToTranslate) {
@@ -957,10 +940,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   }
                 }, 8000);
               }
-            } else if (rawCaption && !isFinished && profileRef.current.captionsEnabled) {
+            } else if (rawCaption && !isFinished && profile.captionsEnabled) {
               // Real-time streaming interim captions
-              const captionLang = profileRef.current.captionLanguage ?? profileRef.current.language;
-              if (captionLang === profileRef.current.language) {
+              const captionLang = profile.captionLanguage ?? profile.language;
+              if (captionLang === profile.language) {
                 // Same language: show audio buffer directly (trying [[LEGENDA:]] first)
                 const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
                 if (interimLegenda && interimLegenda[1]?.trim()) {
@@ -970,6 +953,8 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 }
               } else {
                 // Different language (needsTranslation=true): do NOT show Korean interim.
+                // Accumulate Korean text in lastKoreanTextRef and schedule a debounced translation.
+                // This way the user only ever sees Portuguese, never Korean flashing.
                 lastKoreanTextRef.current = captionBufferRef.current;
 
                 // Debounce: if 1.5s pass without new text, auto-translate what we have so far
