@@ -247,50 +247,47 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const translateCaption = async (fullText: string, targetLang: string) => {
     // 1. Clean the input: strip any AI tags or reasoning BEFORE sending to translation
-    const textToTranslate = stripReasoning(fullText);
-    if (!textToTranslate.trim()) return;
+    const pureText = stripReasoning(fullText);
+    if (!pureText.trim()) return;
 
     const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
     const sourceLang = (LANGUAGE_NAME_MAP as any)[profileRef.current.language] || profileRef.current.language;
 
-    console.log(`[Translation] 🌐 From ${sourceLang} to ${langName}: "${textToTranslate.substring(0, 50)}..."`);
+    console.log(`[Translation] 🌐 From ${sourceLang} to ${langName}: "${pureText.substring(0, 40)}..."`);
 
     // Show a subtle loading indicator
     setCaptionText('⏳...');
 
     try {
+      // Use gemini-2.0-flash which is extremely fast and reliable for simple tasks
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyRef.current}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKeyRef.current}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `You are a professional real-time translator. Translate the following speech from ${sourceLang} into ${langName}. 
-                Output ONLY the translated text. No quotes, no explanations, no meta-text.
-
-                Speech to translate: ${textToTranslate}`
+                text: `Translate this text from ${sourceLang} to ${langName}. Output ONLY the translated text, no extra characters or quotes.\n\nText: ${pureText}`
               }]
             }],
             generationConfig: { maxOutputTokens: 500, temperature: 0 }
           })
         }
       );
+
+      if (!res.ok) {
+        setCaptionText('...'); // Keep dot indicator to show something happened
+        return;
+      }
+
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-      // Final cleanup of the translated text
       const cleaned = translated?.replace(/^[\"']|[\"']$/g, '').trim();
 
       if (cleaned) {
-        console.log(`[Translation] ✅ Success: "${cleaned.substring(0, 50)}..."`);
-        setCaptionText(cleaned);
-        if (captionTimerRef.current) clearTimeout(captionTimerRef.current);
-        captionTimerRef.current = window.setTimeout(() => setCaptionText(''), 20000);
+        showCaption(cleaned);
       } else {
-        console.warn('[Translation] ⚠️ Empty result');
-        // Do NOT show original language if they differ, better show nothing or a "..."
         setCaptionText('...');
       }
     } catch (e) {
