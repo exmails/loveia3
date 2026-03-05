@@ -206,8 +206,11 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const showCaption = (text: string) => {
     if (!text) return;
-    // For non-translated text, we strip reasoning locally
-    // If it was already translated, stripReasoning will just return the dialogue.
+
+    // IMPORTANT: If we are in translation mode (captionLang !== profile.language),
+    // we should only be calling this function with the ALREADY translated text
+    // from translateCaption, or a loading state like '⏳...'.
+    // If we call it with raw text accidentally, stripReasoning acts as a safety.
     const cleaned = stripReasoning(text);
     if (!cleaned) return;
 
@@ -218,26 +221,24 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
     }, 20000);
   };
 
-  // Translate via Gemini generateContent (lightweight text call)
   const stripReasoning = (text: string) => {
     if (!text) return "";
 
-    // 1. Ganhamos: Procuramos especificamente pela tag [[LEGENDA: ...]]
-    // O regex agora é global e mais flexível para capturar o conteúdo mesmo incompleto (incremental)
-    const tagMatch = text.match(/\[\[LEGENDA:\s*([^\]]*)(?:\]\])?/i);
+    // 1. Tag match [[LEGENDA: ...]] (highest priority)
+    const tagMatch = text.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
     if (tagMatch && tagMatch[1]) {
       return tagMatch[1].trim();
     }
 
-    // 2. Bloqueio Total: Se não houver a tag, mas houver marcas de "Pensamento" (**), bloqueamos tudo.
-    // Isso evita que o "Registering Pragmatism" ou "Thinking" apareça enquanto a tag não chega.
-    if (text.includes('**')) {
+    // 2. Clear out thoughts/reasoning often wrapped in markdown
+    // If the text looks like reasoning, return empty (wait for actual dialogue)
+    if (text.includes('**') || text.toLowerCase().includes('thinking') || text.toLowerCase().includes('reasoning')) {
       return "";
     }
 
-    // 3. Fallback de Limpeza para textos curtos sem tag (legado ou erro do modelo)
+    // 3. General cleanup for dialogue leaks
     return text
-      .replace(/Thought:|Context:|Reasoning:|Internal:|Observation:|Inference:/gi, '')
+      .replace(/Thought:|Context:|Reasoning:|Internal:|Observation:|Inference:|Thinking:/gi, '')
       .replace(/\n+/g, ' ')
       .trim();
   };
@@ -912,6 +913,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   const textToTranslate = fullAiText || lastKoreanTextRef.current;
                   lastKoreanTextRef.current = '';
                   if (textToTranslate) {
+                    console.log(`[Captions] Turn End: Languages differ (${p.language} -> ${captionLang}). Translating...`);
                     translateCaption(textToTranslate, captionLang);
                   }
                 } else {
