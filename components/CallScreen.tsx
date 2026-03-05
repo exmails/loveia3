@@ -212,34 +212,23 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const stripReasoning = (text: string) => {
     if (!text) return "";
 
-    // Check for explicit [[LEGENDA: ...]] tag first (AI-generated pre-translation)
-    const explicitMatch = text.match(/\[\[LEGENDA:\s*(.*?)\]\]/i);
-    if (explicitMatch && explicitMatch[1]) {
-      return explicitMatch[1].trim();
+    // 1. Ganhamos: Procuramos especificamente pela tag [[LEGENDA: ...]]
+    // O regex agora é global e mais flexível para capturar o conteúdo mesmo incompleto (incremental)
+    const tagMatch = text.match(/\[\[LEGENDA:\s*([^\]]*)(?:\]\])?/i);
+    if (tagMatch && tagMatch[1]) {
+      return tagMatch[1].trim();
     }
 
-    // Remove everything starting from common AI reasoning markers if they appear later in the text
-    let cleaned = text;
-
-    // Markers that usually signify the end of dialogue and start of thinking
-    const reasoningMarkers = [
-      "**Registering", "**Thinking", "**Reasoning", "**Thought", "**Internal",
-      "Thought:", "Reasoning:", "Context:", "Internal:", "Observation:", "Inference:",
-      "[", "{"
-    ];
-
-    for (const marker of reasoningMarkers) {
-      const index = cleaned.indexOf(marker);
-      if (index !== -1) {
-        cleaned = cleaned.substring(0, index);
-      }
+    // 2. Bloqueio Total: Se não houver a tag, mas houver marcas de "Pensamento" (**), bloqueamos tudo.
+    // Isso evita que o "Registering Pragmatism" ou "Thinking" apareça enquanto a tag não chega.
+    if (text.includes('**')) {
+      return "";
     }
 
-    return cleaned
-      .replace(/\*\*.*?\*\*/g, '') // Remove remaining bold bits
-      .replace(/\[.*?\]/g, '')     // Remove remaining brackets
-      .replace(/\{.*?\}/g, '')     // Remove remaining curlys
-      .replace(/\n+/g, ' ')        // Normalize line breaks
+    // 3. Fallback de Limpeza para textos curtos sem tag (legado ou erro do modelo)
+    return text
+      .replace(/Thought:|Context:|Reasoning:|Internal:|Observation:|Inference:/gi, '')
+      .replace(/\n+/g, ' ')
       .trim();
   };
 
@@ -543,17 +532,17 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         - Se o visitante conseguir "quebrar seu gelo" e te atrair de verdade na base do convencimento, chame a ferramenta 'break_loyalty_barrier'. Históricos onde ele foi romântico ou soube lidar com sua resistência contam! Se aproxima de umas 20 ligações de insistência qualificada para que você considere deixar ele ocupar lugar no seu coração, mas mostre pequenas quebras na armadura aos aos poucos.
 
         REGRAS DE PRIVACIDADE E AGENDA:
-        1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Toda sua fala audível e transcrição natural deve ser em ${profile.language}.
-        2. MODO DE TRADUÇÃO PARA LEGENDAS (CRÍTICO): 
-           - Se o idioma da legenda (${profile.captionLanguage}) for diferente do seu idioma de fala (${profile.language}), você deve SEMPRE iniciar sua resposta de TEXTO escrevendo a tradução do que vai falar.
-           - Formato Obrigatório: [[LEGENDA: <texto traduzido em ${profile.captionLanguage}>]]
-           - Pule uma linha e então comece sua fala audível.
-           - Jamais envie outros pensamentos, raciocínios internos, ações entre asteriscos ou descrições técnicas no canal de texto. O canal de texto serve APENAS para a Legenda e a Transcrição da Fala.
+        1. Responda OBRIGATORIAMENTE no idioma: ${profile.language}. Toda sua fala audível e transcrição natural deve ser em ${profile.language}.
+        2. CANAL DE TEXTO E LEGENDAS (REGRA DE OURO): 
+           - Você deve usar o canal de texto EXCLUSIVAMENTE para enviar a legenda do que você vai falar.
+           - O formato OBRIGATÓRIO de TODA sua resposta de texto é: [[LEGENDA: <sua fala aqui traduzida para ${profile.captionLanguage}>]]
+           - JAMAIS escreva nada fora desses colchetes duplos.
+           - JAMAIS envie seus pensamentos ("Thinking", "Registering"), observações visuais ou logs de ferramentas no canal de texto. Guarde-os apenas para seu processamento interno.
+           - Se você estiver em silêncio apenas observando, não envie nenhum texto.
         3. Responda de forma curta e natural.
-        4. Se você estiver interpretando o que vê pela câmera, use isso apenas para o seu contexto interno de resposta, não descreva isso no texto final.
-        5. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
-        6. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
-        7. HISTÓRICO DE PERSONALIDADE (MUITO IMPORTANTE): Durante a conversa, observe o comportamento do usuário e use 'save_psychological_insight' para registrar frases de reconhecimento. Escreva frases descritivas e específicas na segunda pessoa, como se estivesse descrevendo o usuário: ex: "Você ri quando fica nervoso", "Você costuma ser direto ao pedir algo", "Você demonstra ciúmes quando menciono outras pessoas", "Você parece mais animado de manhã". Salve pelo menos 1 frase por chamada sempre que detectar um padrão claro de comportamento, emoção ou hábito.
+        4. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
+        5. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
+        6. HISTÓRICO DE PERSONALIDADE (MUITO IMPORTANTE): Durante a conversa, observe o comportamento do usuário e use 'save_psychological_insight' para registrar frases de reconhecimento. Escreva frases descritivas e específicas na segunda pessoa, como se estivesse descrevendo o usuário: ex: "Você ri quando fica nervoso", "Você costuma ser direto ao pedir algo", "Você demonstra ciúmes quando menciono outras pessoas", "Você parece mais animado de manhã". Salve pelo menos 1 frase por chamada sempre que detectar um padrão claro de comportamento, emoção ou hábito.
 
         7. Lembre-se: você constrói uma história com ele. Use a MEMÓRIA ATIVA para citar coisas passadas.
         8. SAÚDE DO RELACIONAMENTO (PILARES EM TEMPO REAL):
@@ -889,7 +878,8 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                       const gestureHistory = recentGestures ? `\nHistórico de gestos recentes que você viu: ${recentGestures}.` : "";
 
                       session.sendRealtimeInput({
-                        text: `[OBSERVAÇÃO VISUAL PROATIVA]: Já se passaram 8 segundos. Olhe para a câmera e faça um comentário engraçado sobre o que o usuário está fazendo. ${gestureHistory} Se houver gestos no histórico, tente ligar o que você vê agora com o que ele fez antes (ex: "Você estava sorrindo agora há pouco e agora ficou sério, o que houve?").`
+                        text: `[OBSERVAÇÃO VISUAL PROATIVA]: Já se passaram 8 segundos. Olhe para a câmera e faça um comentário engraçado sobre o que o usuário está fazendo. ${gestureHistory} 
+                        LEMBRE-SE: Sua resposta de texto deve ser exclusivamente no formato [[LEGENDA: <seu comentário aqui em ${profile.captionLanguage}>]]. Não escreva pensamentos.`
                       });
                     });
                   }
