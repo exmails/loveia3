@@ -26,15 +26,17 @@ const GESTURE_EMOJIS: Record<string, string> = {
   'look_away': '👀 Olhando pro lado...'
 };
 
+// Maps PlatformLanguage enum values (which are display names like 'Português', '한국어')
+// to English language names used in translation API prompts.
 const LANGUAGE_NAME_MAP: Record<string, string> = {
-  'Português': 'Portuguese',
+  'Português': 'Brazilian Portuguese',
   'English': 'English',
   'Español': 'Spanish',
   'Français': 'French',
   'Italiano': 'Italian',
   'Deutsch': 'German',
   '日本語': 'Japanese',
-  '中文': 'Chinese',
+  '中文': 'Mandarin Chinese',
   '한국어': 'Korean',
   'العربية': 'Arabic'
 };
@@ -239,7 +241,10 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
     if (!fullText.trim()) return;
 
     const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
-    console.log(`[Translation] Extracting/Translating to ${langName}: "${fullText.substring(0, 30)}..."`);
+    console.log(`[Translation] → Translating to "${langName}" (key="${targetLang}"): "${fullText.substring(0, 50)}..."`);
+
+    // Show a subtle loading indicator while translation is in progress
+    setCaptionText('⏳...');
 
     try {
       const res = await fetch(
@@ -250,11 +255,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `You have received an AI's mixed output which contains both SPOKEN DIALOGUE and INTERNAL REASONING/THOUGHTS. 
-                EXCLUSIVELY extract the spoken dialogue part and translate ONLY that part into ${langName}. 
-                DISCARD all internal thoughts, reasoning steps, or labels like 'Thought:' or 'Registering'.
-                Return ONLY the spoken sentences in ${langName}. 
-                Mixed Output: "${fullText}"`
+                text: `Translate the following spoken text into ${langName}. Return ONLY the translated text, nothing else — no explanations, no quotes, no extra words.\n\nText to translate: ${fullText}`
               }]
             }],
             generationConfig: { maxOutputTokens: 500, temperature: 0 }
@@ -263,18 +264,17 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       );
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      // Remove quotes and any trailing dots/reasoning if LLM failed slightly
-      const cleaned = translated?.replace(/^["']|["']$/g, '');
-      console.log(`[Translation] Result: "${cleaned?.substring(0, 30)}..."`);
+      const cleaned = translated?.replace(/^[\"']|[\"']$/g, '');
+      console.log(`[Translation] ✅ Result (${langName}): "${cleaned?.substring(0, 50)}..."`);
 
       if (cleaned) {
         showCaption(cleaned);
       } else {
-        // Fallback to local strip if AI returned nothing
+        console.warn('[Translation] ⚠️ Empty result, showing original');
         showCaption(stripReasoning(fullText));
       }
     } catch (e) {
-      console.error('[Translation] Error:', e);
+      console.error('[Translation] ❌ Error:', e);
       showCaption(stripReasoning(fullText));
     }
   };
@@ -836,7 +836,11 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
 
             // 2. AI Transcription (Output)
             const transcriptChunk = (message.serverContent as any)?.outputAudioTranscription?.text || (message.serverContent as any)?.outputTranscription?.text;
-            const isFinished = (message.serverContent as any)?.outputAudioTranscription?.finished || (message.serverContent as any)?.outputTranscription?.finished || message.serverContent?.modelTurn?.parts?.[0]?.text ? true : false;
+            // NOTE: Parentheses are critical here to avoid ternary consuming the whole expression
+            const isFinished = (
+              (message.serverContent as any)?.outputAudioTranscription?.finished ||
+              (message.serverContent as any)?.outputTranscription?.finished
+            ) ? true : false;
 
             // FALLBACK logic: Attempt official chunk first, then modelTurn parts.
             // We use fallbackText because some models don't populate outputAudioTranscription yet.
@@ -845,7 +849,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
               .map((p: any) => p.text as string)
               .join('');
 
-            const rawCaption = transcriptChunk || fallbackText || "";
+            // rawCaption: what to accumulate in the audio transcript buffer
+            // Prefer official transcriptChunk; fallback to modelTurn text only if no audio transcription at all
+            const rawCaption = transcriptChunk || (transcriptChunk === undefined ? fallbackText : '') || "";
 
             if (rawCaption) {
               captionBufferRef.current += rawCaption;
