@@ -49,6 +49,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const [captionText, setCaptionText] = useState<string>('');
   const captionTimerRef = useRef<number | null>(null);
   const captionBufferRef = useRef<string>('');
+  const textChannelBufferRef = useRef<string>(''); // Captures AI text channel ([[LEGENDA:]]) separately from audio transcription
   const userCaptionBufferRef = useRef<string>('');
   const pendingTranslateRef = useRef<boolean>(false);
 
@@ -832,17 +833,24 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             if (rawCaption) {
               captionBufferRef.current += rawCaption;
             }
+            // Always capture the AI's text channel separately — it contains [[LEGENDA: translated text]]
+            // This is independent of whether audio transcription is available
+            if (fallbackText) {
+              textChannelBufferRef.current += fallbackText;
+            }
 
             const isTurnFinished = (message.serverContent as any)?.outputAudioTranscription?.finished ||
               (message.serverContent as any)?.outputTranscription?.finished ||
               (message.serverContent?.modelTurn && !audioPart); // If there's a turn without audio bits, it might be the end.
 
-            if (isTurnFinished && captionBufferRef.current.trim()) {
-              const fullAiText = captionBufferRef.current.trim();
+            if (isTurnFinished && (captionBufferRef.current.trim() || textChannelBufferRef.current.trim())) {
+              const fullAiText = captionBufferRef.current.trim(); // Audio transcription (in AI's language)
+              const textChannelText = textChannelBufferRef.current.trim(); // Text channel ([[LEGENDA:]] already translated)
               captionBufferRef.current = '';
+              textChannelBufferRef.current = '';
 
-              // Save AI message to DB
-              if (conversationIdRef.current) {
+              // Save AI message to DB (use audio transcription as source of truth)
+              if (conversationIdRef.current && fullAiText) {
                 supabase.from('messages').insert({
                   conversation_id: conversationIdRef.current,
                   sender: 'ai',
@@ -855,14 +863,23 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
               // Display captions if enabled
               if (profile.captionsEnabled) {
                 const captionLang = profile.captionLanguage ?? profile.language;
-                const needsTranslation = captionLang !== profile.language;
 
-                console.log(`[Captions] Finished. AI Lang: ${profile.language}, Target: ${captionLang}, Needs Translation: ${needsTranslation}`);
+                console.log(`[Captions] Turn finished. AI Lang: ${profile.language}, Caption Target: ${captionLang}`);
+                console.log(`[Captions] Text channel buffer: "${textChannelText.substring(0, 60)}..."`);
 
-                if (needsTranslation) {
+                // PRIORITY 1: Try to extract [[LEGENDA:]] from AI text channel.
+                // The AI already wrote the translation there — use it directly, no extra API call needed.
+                const legendaMatch = textChannelText.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
+                if (legendaMatch && legendaMatch[1]?.trim()) {
+                  console.log(`[Captions] ✅ Using [[LEGENDA:]] from text channel directly.`);
+                  showCaption(legendaMatch[1].trim());
+                } else if (captionLang !== profile.language && fullAiText) {
+                  // PRIORITY 2: Text channel had no [[LEGENDA:]] — fall back to translating the audio transcript
+                  console.log(`[Captions] ⚠️ No [[LEGENDA:]] found, falling back to translateCaption.`);
                   translateCaption(fullAiText, captionLang);
                 } else {
-                  showCaption(fullAiText);
+                  // PRIORITY 3: Same language — just show the audio transcript (stripped)
+                  showCaption(fullAiText || textChannelText);
                 }
 
                 // Vision engagement: If 8 seconds pass after AI finishes and user hasn't talked
@@ -886,14 +903,18 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 }, 8000);
               }
             } else if (rawCaption && !isFinished && profile.captionsEnabled) {
-              // Only stream in real-time if we DON'T need translation.
-              // This prevents English context interpretation from flashing on screen.
+              // Real-time streaming: only show interim captions when same language (no translation)
               const captionLang = profile.captionLanguage ?? profile.language;
-              const needsTranslation = captionLang !== profile.language;
-
-              if (!needsTranslation) {
-                showCaption(captionBufferRef.current);
+              // For same-language captions, try [[LEGENDA:]] from text channel first, then audio buffer
+              if (captionLang === profile.language) {
+                const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
+                if (interimLegenda && interimLegenda[1]?.trim()) {
+                  showCaption(interimLegenda[1].trim());
+                } else {
+                  showCaption(captionBufferRef.current);
+                }
               }
+              // If different language, suppress interim — wait for full turn to get [[LEGENDA:]] from text channel
             }
             if (message.serverContent?.interrupted) {
               sourcesRef.current.forEach(s => s.stop());
@@ -911,6 +932,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 });
               }
               captionBufferRef.current = ''; // clear partial caption on interruption
+              textChannelBufferRef.current = ''; // clear text channel buffer on interruption
             }
           },
           onclose: () => setIsConnected(false),
