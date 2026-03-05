@@ -196,6 +196,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const showCaption = (text: string) => {
     if (!text) return;
+    // For non-translated text, we strip reasoning locally
+    // If it was already translated, stripReasoning will just return the dialogue.
     const cleaned = stripReasoning(text);
     if (!cleaned) return;
 
@@ -235,12 +237,12 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       .trim();
   };
 
-  const translateCaption = async (text: string, targetLang: string) => {
-    const dialogueOnly = stripReasoning(text);
-    if (!dialogueOnly) return;
+  const translateCaption = async (fullText: string, targetLang: string) => {
+    if (!fullText.trim()) return;
 
     const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
-    console.log(`[Translation] Translating to ${langName}: "${dialogueOnly.substring(0, 30)}..."`);
+    console.log(`[Translation] Extracting/Translating to ${langName}: "${fullText.substring(0, 30)}..."`);
+
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -248,19 +250,34 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `Translate this AI voice transcription into ${langName}. Remove any internal reasoning or [meta-text]. Return ONLY the translated speech. Text: "${dialogueOnly}"` }] }],
+            contents: [{
+              parts: [{
+                text: `You have received an AI's mixed output which contains both SPOKEN DIALOGUE and INTERNAL REASONING/THOUGHTS. 
+                EXCLUSIVELY extract the spoken dialogue part and translate ONLY that part into ${langName}. 
+                DISCARD all internal thoughts, reasoning steps, or labels like 'Thought:' or 'Registering'.
+                Return ONLY the spoken sentences in ${langName}. 
+                Mixed Output: "${fullText}"`
+              }]
+            }],
             generationConfig: { maxOutputTokens: 500, temperature: 0 }
           })
         }
       );
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      // Remove quotes and any trailing dots/reasoning if LLM failed slightly
       const cleaned = translated?.replace(/^["']|["']$/g, '');
       console.log(`[Translation] Result: "${cleaned?.substring(0, 30)}..."`);
-      showCaption(cleaned || translated || dialogueOnly);
+
+      if (cleaned) {
+        showCaption(cleaned);
+      } else {
+        // Fallback to local strip if AI returned nothing
+        showCaption(stripReasoning(fullText));
+      }
     } catch (e) {
       console.error('[Translation] Error:', e);
-      showCaption(dialogueOnly);
+      showCaption(stripReasoning(fullText));
     }
   };
 
@@ -521,11 +538,12 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
 
         REGRAS DE PRIVACIDADE E AGENDA:
         1. Responda OBRIGATORIAMENTE, SEMPRE e EXCLUSIVAMENTE no idioma: ${profile.language}. Nunca use outro idioma em sua fala, nem mesmo se provocado ou se o usuário falar outra língua. Toda sua fala, transcrição, pensamentos e descrições de contexto devem ser gerados diretamente em ${profile.language}.
-        2. NUNCA gere ou envie textos explicativos, "pensamentos" ou "internal reasoning" como parte da sua resposta de texto. Sua saída de texto deve ser EXCLUSIVAMENTE a transcrição do que você está falando em áudio. Bloqueie qualquer saída que descreva suas ações entre asteriscos ou colchetes. Jamais envie textos em Inglês para o sistema de transcrição ou visão.
-        3. Responda de forma curta e natural.
-        4. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
-        5. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
-        6. HISTÓRICO DE PERSONALIDADE (MUITO IMPORTANTE): Durante a conversa, observe o comportamento do usuário e use 'save_psychological_insight' para registrar frases de reconhecimento. Escreva frases descritivas e específicas na segunda pessoa, como se estivesse descrevendo o usuário: ex: "Você ri quando fica nervoso", "Você costuma ser direto ao pedir algo", "Você demonstra ciúmes quando menciono outras pessoas", "Você parece mais animado de manhã". Salve pelo menos 1 frase por chamada sempre que detectar um padrão claro de comportamento, emoção ou hábito.
+        2. NUNCA gere ou envie textos explicativos, "pensamentos" ou "internal reasoning" como parte da sua resposta de texto audível. Suas reflexões internas e uso de ferramentas devem ser discretos. A saída de texto oficial deve refletir APENAS a fala.
+        3. Se você estiver interpretando o que vê pela câmera, descreva isso apenas em ${profile.language} e apenas como reflexão preliminar à sua fala.
+        4. Responda de forma curta e natural.
+        5. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
+        6. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
+        7. HISTÓRICO DE PERSONALIDADE (MUITO IMPORTANTE): Durante a conversa, observe o comportamento do usuário e use 'save_psychological_insight' para registrar frases de reconhecimento. Escreva frases descritivas e específicas na segunda pessoa, como se estivesse descrevendo o usuário: ex: "Você ri quando fica nervoso", "Você costuma ser direto ao pedir algo", "Você demonstra ciúmes quando menciono outras pessoas", "Você parece mais animado de manhã". Salve pelo menos 1 frase por chamada sempre que detectar um padrão claro de comportamento, emoção ou hábito.
 
         7. Lembre-se: você constrói uma história com ele. Use a MEMÓRIA ATIVA para citar coisas passadas.
         8. SAÚDE DO RELACIONAMENTO (PILARES EM TEMPO REAL):
