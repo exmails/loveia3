@@ -196,15 +196,7 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const showCaption = (text: string) => {
     if (!text) return;
-    // Clean up any AI reasoning artifacts like **thoughts**, [context], or technical logs
-    const cleaned = text
-      .replace(/\*\*.*?\*\*/g, '') // Remove **bold reasoning**
-      .replace(/\[.*?\]/g, '')     // Remove [bracketed notes]
-      .replace(/\{.*?\}/g, '')     // Remove {json/curly}
-      .replace(/Thought:|Context:|Reasoning:|Internal:|Observation:|Inference:/gi, '')
-      .replace(/\n+/g, ' ')        // Normalizar quebras de linha
-      .trim();
-
+    const cleaned = stripReasoning(text);
     if (!cleaned) return;
 
     setCaptionText(cleaned);
@@ -215,10 +207,40 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   };
 
   // Translate via Gemini generateContent (lightweight text call)
+  const stripReasoning = (text: string) => {
+    if (!text) return "";
+    // Remove everything starting from common AI reasoning markers if they appear later in the text
+    // Spoken dialogue is usually at the beginning.
+    let cleaned = text;
+
+    // Markers that usually signify the end of dialogue and start of thinking
+    const reasoningMarkers = [
+      "**Registering", "**Thinking", "**Reasoning", "**Thought", "**Internal",
+      "Thought:", "Reasoning:", "Context:", "Internal:", "Observation:", "Inference:",
+      "[", "{"
+    ];
+
+    for (const marker of reasoningMarkers) {
+      const index = cleaned.indexOf(marker);
+      if (index !== -1) {
+        cleaned = cleaned.substring(0, index);
+      }
+    }
+
+    return cleaned
+      .replace(/\*\*.*?\*\*/g, '') // Remove remaining bold bits
+      .replace(/\[.*?\]/g, '')     // Remove remaining brackets
+      .replace(/\{.*?\}/g, '')     // Remove remaining curlys
+      .replace(/\n+/g, ' ')        // Normalize line breaks
+      .trim();
+  };
+
   const translateCaption = async (text: string, targetLang: string) => {
-    if (!text.trim()) return;
+    const dialogueOnly = stripReasoning(text);
+    if (!dialogueOnly) return;
+
     const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
-    console.log(`[Translation] Translating to ${langName}: "${text.substring(0, 30)}..."`);
+    console.log(`[Translation] Translating to ${langName}: "${dialogueOnly.substring(0, 30)}..."`);
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -226,22 +248,19 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `Translate this AI voice transcription into ${langName}. Remove any internal reasoning, tool logs, or [meta-text]. Return ONLY the translated speech. Text: "${text}"` }] }],
+            contents: [{ parts: [{ text: `Translate this AI voice transcription into ${langName}. Remove any internal reasoning or [meta-text]. Return ONLY the translated speech. Text: "${dialogueOnly}"` }] }],
             generationConfig: { maxOutputTokens: 500, temperature: 0 }
           })
         }
       );
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      // Remove quotes if the AI added them
       const cleaned = translated?.replace(/^["']|["']$/g, '');
       console.log(`[Translation] Result: "${cleaned?.substring(0, 30)}..."`);
-
-      // If the translation failed or returned exactly the same junk, we try to at least show something
-      showCaption(cleaned || translated || text);
+      showCaption(cleaned || translated || dialogueOnly);
     } catch (e) {
       console.error('[Translation] Error:', e);
-      showCaption(text);
+      showCaption(dialogueOnly);
     }
   };
 
@@ -782,18 +801,26 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
 
             // 2. AI Transcription (Output)
             const transcriptChunk = (message.serverContent as any)?.outputAudioTranscription?.text || (message.serverContent as any)?.outputTranscription?.text;
-            const isFinished = (message.serverContent as any)?.outputAudioTranscription?.finished || (message.serverContent as any)?.outputTranscription?.finished;
+            const isFinished = (message.serverContent as any)?.outputAudioTranscription?.finished || (message.serverContent as any)?.outputTranscription?.finished || message.serverContent?.modelTurn?.parts?.[0]?.text ? true : false;
 
-            // CRITICAL: We EXCLUSIVELY use the official transcription stream.
-            // The 'allParts' / 'fallbackText' logic often contains AI "Internal Reasoning" (like **Thinking...**)
-            // which we want to keep hidden from the user.
-            const rawCaption = transcriptChunk || "";
+            // FALLBACK logic: Attempt official chunk first, then modelTurn parts.
+            // We use fallbackText because some models don't populate outputAudioTranscription yet.
+            const fallbackText = allParts
+              .filter((p: any) => typeof p?.text === 'string' && p.text.trim())
+              .map((p: any) => p.text as string)
+              .join('');
+
+            const rawCaption = transcriptChunk || fallbackText || "";
 
             if (rawCaption) {
               captionBufferRef.current += rawCaption;
             }
 
-            if (isFinished && captionBufferRef.current.trim()) {
+            const isTurnFinished = (message.serverContent as any)?.outputAudioTranscription?.finished ||
+              (message.serverContent as any)?.outputTranscription?.finished ||
+              (message.serverContent?.modelTurn && !audioPart); // If there's a turn without audio bits, it might be the end.
+
+            if (isTurnFinished && captionBufferRef.current.trim()) {
               const fullAiText = captionBufferRef.current.trim();
               captionBufferRef.current = '';
 
