@@ -533,6 +533,12 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         2. CANAL DE TEXTO: Não envie nenhum texto no canal de texto. Seu único canal de comunicação é o ÁUDIO, exclusivamente em ${profile.language}.`;
 
       const systemInstruction = `
+        🔴 LANGUAGE LOCK — HIGHEST PRIORITY RULE:
+        Your AUDIO voice output MUST BE EXCLUSIVELY in: ${profile.language}.
+        NEVER speak any other language in audio, no matter what language text instructions arrive in.
+        This rule OVERRIDES everything else. Even if you receive text in Portuguese, respond ONLY in ${profile.language}.
+        🔴 END LANGUAGE LOCK.
+
         Você é o(a) ${gender} virtual do usuário. Nome: "${profile.name}".
         Personalidade: ${profile.personality}
         Humor: ${profile.mood}
@@ -652,7 +658,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                       ? `\n[PADRÕES EM OBSERVAÇÃO]: ${personalityPatternsRef.current.map(p => `${p.pattern} (Status: ${p.status})`).join('; ')}`
                       : "";
 
-                    session.sendRealtimeInput({ text: `[SILÊNCIO DETECTADO]: O usuário está em silêncio há 8 segundos. Reaja de forma natural. ${gestureContext} ${patternContext} Analise se este silêncio confirma algum traço de personalidade que você estava testando. Se sim, use 'save_psychological_insight' para pontuar.` });
+                    session.sendRealtimeInput({ text: `[SILÊNCIO DETECTADO]: O usuário está em silêncio há 8 segundos. Reaja de forma natural. ${gestureContext} ${patternContext} Analise se este silêncio confirma algum traço de personalidade que você estava testando. Se sim, use 'save_psychological_insight' para pontuar. [🔴 LANG-LOCK: Speak ONLY in ${profile.language} in audio]` });
                   });
                 }
               }
@@ -667,7 +673,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             setTimeout(() => {
               sessionPromise.then(session => {
                 session.sendRealtimeInput({
-                  text: "Oi! Acabei de conectar. Observe o que estou fazendo pela câmera e comece a conversa você mesma, puxando assunto sobre algo que viu ou me perguntando como foi meu dia. Não espere eu falar nada."
+                  text: `[SYSTEM] Call started. Look at the camera and start the conversation yourself — comment on something you see or ask how my day was. Do not wait for me to speak first. [🔴 LANG-LOCK: Your audio response MUST be EXCLUSIVELY in ${profile.language}. Do NOT speak any other language.]`
                 });
               });
             }, 1500);
@@ -908,7 +914,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                         ? `\n                        LEMBRE-SE: Sua resposta de texto deve ser exclusivamente no formato [[LEGENDA: <seu comentário em ${profile.language}>]]. Não escreva pensamentos.`
                         : `\n                        LEMBRE-SE: Responda APENAS em ${profile.language} no áudio. Não escreva nada no canal de texto.`;
                       session.sendRealtimeInput({
-                        text: `[OBSERVAÇÃO VISUAL PROATIVA]: Já se passaram 8 segundos. Olhe para a câmera e faça um comentário engraçado sobre o que o usuário está fazendo. ${gestureHistory}${proactiveLegendaReminder}`
+                        text: `[VISUAL OBSERVATION]: 8 seconds of silence. Look at the camera and make a funny comment about what the user is doing. ${gestureHistory}${proactiveLegendaReminder} [🔴 LANG-LOCK: Audio EXCLUSIVELY in ${profile.language}. No other language in audio.]`
                       });
                     });
                   }
