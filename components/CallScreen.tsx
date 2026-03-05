@@ -88,6 +88,14 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const isDark = profile.theme === 'dark';
 
+  const profileRef = useRef(profile);
+  const apiKeyRef = useRef(apiKey);
+
+  useEffect(() => {
+    profileRef.current = profile;
+    apiKeyRef.current = apiKey;
+  }, [profile, apiKey]);
+
   useEffect(() => {
     startCall();
     startVisualizerLoop();
@@ -238,24 +246,31 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   };
 
   const translateCaption = async (fullText: string, targetLang: string) => {
-    if (!fullText.trim()) return;
+    // 1. Clean the input: strip any AI tags or reasoning BEFORE sending to translation
+    const textToTranslate = stripReasoning(fullText);
+    if (!textToTranslate.trim()) return;
 
     const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
-    console.log(`[Translation] → Translating to "${langName}" (key="${targetLang}"): "${fullText.substring(0, 50)}..."`);
+    const sourceLang = (LANGUAGE_NAME_MAP as any)[profileRef.current.language] || profileRef.current.language;
 
-    // Show a subtle loading indicator while translation is in progress
+    console.log(`[Translation] 🌐 From ${sourceLang} to ${langName}: "${textToTranslate.substring(0, 50)}..."`);
+
+    // Show a subtle loading indicator
     setCaptionText('⏳...');
 
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKeyRef.current}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `Translate the following spoken text into ${langName}. Return ONLY the translated text, nothing else — no explanations, no quotes, no extra words.\n\nText to translate: ${fullText}`
+                text: `You are a professional real-time translator. Translate the following speech from ${sourceLang} into ${langName}. 
+                Output ONLY the translated text. No quotes, no explanations, no meta-text.
+
+                Speech to translate: ${textToTranslate}`
               }]
             }],
             generationConfig: { maxOutputTokens: 500, temperature: 0 }
@@ -264,18 +279,23 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
       );
       const json = await res.json();
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      const cleaned = translated?.replace(/^[\"']|[\"']$/g, '');
-      console.log(`[Translation] ✅ Result (${langName}): "${cleaned?.substring(0, 50)}..."`);
+
+      // Final cleanup of the translated text
+      const cleaned = translated?.replace(/^[\"']|[\"']$/g, '').trim();
 
       if (cleaned) {
-        showCaption(cleaned);
+        console.log(`[Translation] ✅ Success: "${cleaned.substring(0, 50)}..."`);
+        setCaptionText(cleaned);
+        if (captionTimerRef.current) clearTimeout(captionTimerRef.current);
+        captionTimerRef.current = window.setTimeout(() => setCaptionText(''), 20000);
       } else {
-        console.warn('[Translation] ⚠️ Empty result, showing original');
-        showCaption(stripReasoning(fullText));
+        console.warn('[Translation] ⚠️ Empty result');
+        // Do NOT show original language if they differ, better show nothing or a "..."
+        setCaptionText('...');
       }
     } catch (e) {
       console.error('[Translation] ❌ Error:', e);
-      showCaption(stripReasoning(fullText));
+      setCaptionText('...');
     }
   };
 
@@ -885,10 +905,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
               }
 
               // Display captions if enabled
-              if (profile.captionsEnabled) {
-                const captionLang = profile.captionLanguage ?? profile.language;
+              if (profileRef.current.captionsEnabled) {
+                const captionLang = profileRef.current.captionLanguage ?? profileRef.current.language;
 
-                console.log(`[Captions] Turn finished. AI Lang: ${profile.language}, Caption Target: ${captionLang}`);
+                console.log(`[Captions] Turn finished. AI Lang: ${profileRef.current.language}, Caption Target: ${captionLang}`);
                 console.log(`[Captions] Text channel buffer: "${textChannelText.substring(0, 60)}..."`);
 
                 // Cancel any pending debounced translation — the full turn is done now
@@ -898,7 +918,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 }
 
                 // PRIORITY 1: If languages differ, we MUST translate the audio transcript.
-                if (captionLang !== profile.language) {
+                if (captionLang !== profileRef.current.language) {
                   const textToTranslate = fullAiText || lastKoreanTextRef.current;
                   lastKoreanTextRef.current = '';
                   if (textToTranslate) {
@@ -940,10 +960,10 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   }
                 }, 8000);
               }
-            } else if (rawCaption && !isFinished && profile.captionsEnabled) {
+            } else if (rawCaption && !isFinished && profileRef.current.captionsEnabled) {
               // Real-time streaming interim captions
-              const captionLang = profile.captionLanguage ?? profile.language;
-              if (captionLang === profile.language) {
+              const captionLang = profileRef.current.captionLanguage ?? profileRef.current.language;
+              if (captionLang === profileRef.current.language) {
                 // Same language: show audio buffer directly (trying [[LEGENDA:]] first)
                 const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
                 if (interimLegenda && interimLegenda[1]?.trim()) {
@@ -953,8 +973,6 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 }
               } else {
                 // Different language (needsTranslation=true): do NOT show Korean interim.
-                // Accumulate Korean text in lastKoreanTextRef and schedule a debounced translation.
-                // This way the user only ever sees Portuguese, never Korean flashing.
                 lastKoreanTextRef.current = captionBufferRef.current;
 
                 // Debounce: if 1.5s pass without new text, auto-translate what we have so far
