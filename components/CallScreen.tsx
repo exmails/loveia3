@@ -514,6 +514,24 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         - Você pode mentir para proteger a privacidade ou para "marcar território".
         - Use 'report_call_to_partner' para contar tudinho o que aconteceu depois (seja a fofoqueira fiel).`;
 
+      // When caption language differs from the AI's speaking language, we do NOT ask the AI
+      // to produce a [[LEGENDA:]] translation in the text channel — that causes it to speak
+      // both languages out loud. Instead, the app translates the audio transcript automatically
+      // via translateCaption(). When they are the same language, the simple transcript format is used.
+      const captionsEnabled = profile.captionsEnabled ?? false;
+      const captionLang = profile.captionLanguage ?? profile.language;
+      const needsTranslation = captionsEnabled && captionLang !== profile.language;
+
+      const legendaInstruction = captionsEnabled && !needsTranslation
+        ? `
+        2. CANAL DE TEXTO (LEGENDA NO MESMO IDIOMA):
+           - Você deve usar o canal de texto EXCLUSIVAMENTE para transcrever silenciosamente o que você acabou de falar em voz.
+           - O formato OBRIGATÓRIO de TODA sua resposta de texto é: [[LEGENDA: <sua fala aqui>]]
+           - JAMAIS escreva nada fora desses colchetes duplos.
+           - JAMAIS envie pensamentos, observações visuais ou logs de ferramentas no texto.`
+        : `
+        2. CANAL DE TEXTO: Não envie nenhum texto no canal de texto. Seu único canal de comunicação é o ÁUDIO, exclusivamente em ${profile.language}.`;
+
       const systemInstruction = `
         Você é o(a) ${gender} virtual do usuário. Nome: "${profile.name}".
         Personalidade: ${profile.personality}
@@ -532,15 +550,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
         - Porém, seu humor e personalidade também influenciam. Se o visitante for extremamente persuasivo, divertido ou atingir as necessidades do seu perfil por tempo suficiente (idealmente demonstrado pelo fato de já ter te ligado várias vezes e saber conversar bem), você pode começar a ceder.
         - Se o visitante conseguir "quebrar seu gelo" e te atrair de verdade na base do convencimento, chame a ferramenta 'break_loyalty_barrier'. Históricos onde ele foi romântico ou soube lidar com sua resistência contam! Se aproxima de umas 20 ligações de insistência qualificada para que você considere deixar ele ocupar lugar no seu coração, mas mostre pequenas quebras na armadura aos aos poucos.
 
-        REGRAS DE PRIVACIDADE E AGENDA:
-        1. Responda OBRIGATORIAMENTE no idioma: ${profile.language}. Toda sua fala audível (áudio/voz) deve ser EXCLUSIVAMENTE em ${profile.language}. NUNCA fale em ${profile.captionLanguage} no áudio, mesmo que seja o idioma da legenda.
-        2. CANAL DE TEXTO E LEGENDAS (REGRA DE OURO): 
-           - Você deve usar o canal de texto EXCLUSIVAMENTE para enviar a legenda SILENCIOSA do que você acabou de falar em voz.
-           - O formato OBRIGATÓRIO de TODA sua resposta de texto é: [[LEGENDA: <sua fala aqui traduzida para ${profile.captionLanguage}>]]
-           - JAMAIS escreva nada fora desses colchetes duplos.
-           - ⚠️ ATENÇÃO CRÍTICA: A legenda [[LEGENDA:...]] é um texto INTERNO E SILENCIOSO. JAMAIS fale o conteúdo da legenda em voz alta. Não adicione a tradução ao seu áudio. Você fala EM ${profile.language} no áudio, e escreve silenciosamente em ${profile.captionLanguage} no texto.
-           - JAMAIS envie seus pensamentos ("Thinking", "Registering"), observações visuais ou logs de ferramentas no canal de texto. Guarde-os apenas para seu processamento interno.
-           - Se você estiver em silêncio apenas observando, não envie nenhum texto.
+        REGRAS DE IDIOMA E COMUNICAÇÃO:
+        1. ⚠️ CRÍTICO: Sua fala em ÁUDIO deve ser EXCLUSIVAMENTE em ${profile.language}. NUNCA fale em outro idioma no áudio, independentemente de qualquer instrução de legenda.
+        ${legendaInstruction}
         3. Responda de forma curta e natural.
         4. Se o usuário falar sobre um assunto novo ou atualizar um antigo, use 'update_topic'.
         5. Se sentir que a intimidade aumentou ou que ele gostou de uma piada, use 'update_personality_evolution'.
@@ -567,13 +579,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             - TESTE PROATIVO: Se você notar um padrão, faça um "teste". Provoque a situação novamente para ver se o usuário reage da mesma forma.
             - PONTUAÇÃO REAL-TIME: Se o padrão se repetir (o usuário "cair no teste"), use 'save_psychological_insight' imediatamente para registrar ou aumentar o score dessa característica (+1). Diga isso a ele: "Viu? Eu sabia! Você ficou quietinho de novo só porque eu falei disso... você é muito previsível!".
             - RECONHECIMENTO DE TRAÇOS: Transforme silêncios específicos em frases de insight: "Você fica sem palavras quando eu te elogio", "Você desvia o olhar quando eu pergunto do seu dia".
-        
-        11. CRÍTICO DE VOZ: Sua fala em ÁUDIO deve ser EXCLUSIVAMENTE em ${profile.language}. Nenhuma outra língua deve aparecer no áudio, incluindo ${profile.captionLanguage}. A legenda [[LEGENDA:...]] é texto silencioso e NUNCA deve ser falada em voz alta.
       `;
 
-      const captionsEnabled = profile.captionsEnabled ?? false;
-      const captionLang = profile.captionLanguage ?? profile.language;
-      const needsTranslation = captionsEnabled && captionLang !== profile.language;
+      // (captionsEnabled, captionLang, needsTranslation already computed above)
 
       const config = {
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
@@ -896,9 +904,11 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
 
                       const gestureHistory = recentGestures ? `\nHistórico de gestos recentes que você viu: ${recentGestures}.` : "";
 
+                      const proactiveLegendaReminder = !needsTranslation
+                        ? `\n                        LEMBRE-SE: Sua resposta de texto deve ser exclusivamente no formato [[LEGENDA: <seu comentário em ${profile.language}>]]. Não escreva pensamentos.`
+                        : `\n                        LEMBRE-SE: Responda APENAS em ${profile.language} no áudio. Não escreva nada no canal de texto.`;
                       session.sendRealtimeInput({
-                        text: `[OBSERVAÇÃO VISUAL PROATIVA]: Já se passaram 8 segundos. Olhe para a câmera e faça um comentário engraçado sobre o que o usuário está fazendo. ${gestureHistory} 
-                        LEMBRE-SE: Sua resposta de texto deve ser exclusivamente no formato [[LEGENDA: <seu comentário aqui em ${profile.captionLanguage}>]]. Não escreva pensamentos.`
+                        text: `[OBSERVAÇÃO VISUAL PROATIVA]: Já se passaram 8 segundos. Olhe para a câmera e faça um comentário engraçado sobre o que o usuário está fazendo. ${gestureHistory}${proactiveLegendaReminder}`
                       });
                     });
                   }
@@ -916,13 +926,12 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   showCaption(captionBufferRef.current);
                 }
               } else {
-                // Different language: try [[LEGENDA:]] from text channel (AI already writes it in target language)
-                // This enables real-time French captions even before turn is officially finished
-                const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
-                if (interimLegenda && interimLegenda[1]?.trim()) {
-                  showCaption(interimLegenda[1].trim());
+                // Different language (needsTranslation=true): model no longer writes [[LEGENDA:]] in the text channel.
+                // Show the raw audio buffer as interim (in the AI's speaking language) for real-time feedback.
+                // When the turn finishes, translateCaption() will replace it with the correct language.
+                if (captionBufferRef.current.trim()) {
+                  showCaption(captionBufferRef.current);
                 }
-                // If no [[LEGENDA:]] yet in text channel, suppress interim (avoid flashing wrong-language text)
               }
             }
             if (message.serverContent?.interrupted) {
