@@ -207,23 +207,17 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const showCaption = (text: string, isFromTranslation: boolean = false) => {
     if (!text) return;
 
-    // PROTECTION: If we expect a translation but this call came from a raw source, block it.
-    // This prevents Portuguese from appearing when English is selected.
-    const p = profileRef.current;
-    const captionLang = p.captionLanguage ?? p.language;
-    if (captionLang !== p.language && !isFromTranslation && text !== '⏳...') {
-      console.warn(`[Captions] 🚫 Blocking raw text leak: "${text.substring(0, 30)}..." (Expected: ${captionLang})`);
-      return;
-    }
-
+    // Strip reasoning tags or thinking markdown
     const cleaned = stripReasoning(text);
     if (!cleaned) return;
 
     setCaptionText(cleaned);
+
+    // Auto-clear caption after 15 seconds if not updated
     if (captionTimerRef.current) clearTimeout(captionTimerRef.current);
     captionTimerRef.current = window.setTimeout(() => {
       setCaptionText('');
-    }, 20000);
+    }, 15000);
   };
 
   const stripReasoning = (text: string) => {
@@ -915,21 +909,22 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   pendingTranslationTimerRef.current = null;
                 }
 
+                // Show immediate raw text for responsiveness
+                const legendaMatch = textChannelText.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
+                const immediateText = (legendaMatch && legendaMatch[1]?.trim()) || fullAiText || textChannelText;
+
+                if (immediateText) {
+                  showCaption(immediateText, false);
+                }
+
                 if (captionLang !== p.language) {
-                  const textToTranslate = fullAiText || lastKoreanTextRef.current;
+                  const textToTranslate = immediateText;
                   lastKoreanTextRef.current = '';
                   if (textToTranslate) {
-                    console.log(`[Captions] 🎌 Turn Finished. Needs translation from ${p.language} to ${captionLang}.`);
+                    console.log(`[Captions] 🎌 Turn Finished. Queuing translation to ${captionLang}...`);
                     translateCaption(textToTranslate, captionLang);
                   }
                 } else {
-                  // PRIORITY 2: Same language. Try text channel first, then raw audio transcript
-                  const legendaMatch = textChannelText.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
-                  if (legendaMatch && legendaMatch[1]?.trim()) {
-                    showCaption(legendaMatch[1].trim(), false);
-                  } else {
-                    showCaption(fullAiText || textChannelText, false);
-                  }
                   lastKoreanTextRef.current = '';
                 }
 
@@ -962,17 +957,17 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
               const p = profileRef.current;
               const captionLang = p.captionLanguage ?? p.language;
 
-              if (captionLang === p.language) {
-                // Same language: show audio buffer directly (trying [[LEGENDA:]] first)
-                const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
-                if (interimLegenda && interimLegenda[1]?.trim()) {
-                  showCaption(interimLegenda[1].trim(), false);
-                } else {
-                  showCaption(captionBufferRef.current, false);
-                }
-              } else {
-                // Different language — Debounce translation
-                lastKoreanTextRef.current = captionBufferRef.current;
+              // Always try to show immediate raw text for responsiveness
+              const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
+              const immediateInterim = (interimLegenda && interimLegenda[1]?.trim()) || captionBufferRef.current;
+
+              if (immediateInterim) {
+                showCaption(immediateInterim, false);
+              }
+
+              if (captionLang !== p.language) {
+                // Accumulate for debounced translation update
+                lastKoreanTextRef.current = immediateInterim;
 
                 if (pendingTranslationTimerRef.current) clearTimeout(pendingTranslationTimerRef.current);
                 pendingTranslationTimerRef.current = window.setTimeout(() => {
@@ -981,7 +976,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                     lastKoreanTextRef.current = '';
                     translateCaption(toTranslate, captionLang);
                   }
-                }, 1500);
+                }, 2000); // Wait 2s of silence to update translation
               }
             }
             if (message.serverContent?.interrupted) {
