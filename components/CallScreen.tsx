@@ -273,6 +273,14 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
         }
       );
       const json = await res.json();
+
+      if (json.error) {
+        console.error('[Translation] ❌ Gemini API Error:', json.error);
+        // Fallback: show original since translation failed
+        showCaption(fullText, false);
+        return;
+      }
+
       const translated = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
       if (translated) {
@@ -280,12 +288,14 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
         console.log(`[Translation] ✅ Success: "${cleaned.substring(0, 40)}..."`);
         showCaption(cleaned, true);
       } else {
-        console.error('[Translation] ❌ Failed to get results in JSON:', json);
-        setCaptionText('[Translation Error]');
+        console.warn('[Translation] ⚠️ Empty result or safety block. Showing original.', json);
+        // Fallback: show original
+        showCaption(fullText, false);
       }
     } catch (e) {
-      console.error('[Translation] ❌ Network Error:', e);
-      setCaptionText('[Network Error]');
+      console.error('[Translation] ❌ Network/System Error:', e);
+      // Fallback: show original
+      showCaption(fullText, false);
     }
   };
 
