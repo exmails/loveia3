@@ -88,6 +88,11 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
 
   const isDark = profile.theme === 'dark';
 
+  const profileRef = useRef(profile);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+
   useEffect(() => {
     startCall();
     startVisualizerLoop();
@@ -240,10 +245,11 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const translateCaption = async (fullText: string, targetLang: string) => {
     if (!fullText.trim()) return;
 
+    const currentProfile = profileRef.current;
     const langName = (LANGUAGE_NAME_MAP as any)[targetLang] || targetLang;
-    console.log(`[Translation] → Translating to "${langName}" (key="${targetLang}"): "${fullText.substring(0, 50)}..."`);
+    console.log(`[Translation] 🌐 From ${currentProfile.language} to ${langName} | Text: "${fullText.substring(0, 40)}..."`);
 
-    // Show a subtle loading indicator while translation is in progress
+    // Show a subtle loading indicator
     setCaptionText('⏳...');
 
     try {
@@ -255,10 +261,13 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
           body: JSON.stringify({
             contents: [{
               parts: [{
-                text: `Translate the following spoken text into ${langName}. Return ONLY the translated text, nothing else — no explanations, no quotes, no extra words.\n\nText to translate: ${fullText}`
+                text: `Translate the following spoken text from ${currentProfile.language} into ${langName}. 
+                Return ONLY the translated text, nothing else. No explanations, no preamble. 
+                If the input is already in ${langName}, return it as is but ensure it is natural.
+                Input text: ${fullText}`
               }]
             }],
-            generationConfig: { maxOutputTokens: 500, temperature: 0 }
+            generationConfig: { maxOutputTokens: 600, temperature: 0 }
           })
         }
       );
@@ -647,6 +656,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   isUserTalkingRef.current = false;
                   lastSilencePromptRef.current = Date.now();
                   sessionPromise.then(session => {
+                    const p = profileRef.current;
                     const recentGestures = gestureLogRef.current
                       ? gestureLogRef.current
                         .filter(g => Date.now() - g.timestamp < 30000)
@@ -660,7 +670,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                       ? `\n[PADRÕES EM OBSERVAÇÃO]: ${personalityPatternsRef.current.map(p => `${p.pattern} (Status: ${p.status})`).join('; ')}`
                       : "";
 
-                    session.sendRealtimeInput({ text: `[SILÊNCIO DETECTADO]: O usuário está em silêncio há 8 segundos. Reaja de forma natural. ${gestureContext} ${patternContext} Analise se este silêncio confirma algum traço de personalidade que você estava testando. Se sim, use 'save_psychological_insight' para pontuar. [🔴 LANG-LOCK: Speak ONLY in ${profile.language} in audio]` });
+                    session.sendRealtimeInput({ text: `[SILÊNCIO DETECTADO]: O usuário está em silêncio há 8 segundos. Reaja de forma natural. ${gestureContext} ${patternContext} Analise se este silêncio confirma algum traço de personalidade que você estava testando. Se sim, use 'save_psychological_insight' para pontuar. [🔴 LANG-LOCK: Speak ONLY in ${p.language} in audio]` });
                   });
                 }
               }
@@ -674,8 +684,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
             // Initial engagement trigger
             setTimeout(() => {
               sessionPromise.then(session => {
+                const p = profileRef.current;
                 session.sendRealtimeInput({
-                  text: `[SYSTEM] Call started. Look at the camera and start the conversation yourself — comment on something you see or ask how my day was. Do not wait for me to speak first. [🔴 LANG-LOCK: Your audio response MUST be EXCLUSIVELY in ${profile.language}. Do NOT speak any other language.]`
+                  text: `[SYSTEM] Call started. Look at the camera and start the conversation yourself — comment on something you see or ask how my day was. Do not wait for me to speak first. [🔴 LANG-LOCK: Your audio response MUST be EXCLUSIVELY in ${p.language}. Do NOT speak any other language.]`
                 });
               });
             }, 1500);
@@ -885,34 +896,30 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
               }
 
               // Display captions if enabled
-              if (profile.captionsEnabled) {
-                const captionLang = profile.captionLanguage ?? profile.language;
+              if (profileRef.current.captionsEnabled) {
+                const p = profileRef.current;
+                const captionLang = p.captionLanguage ?? p.language;
 
-                console.log(`[Captions] Turn finished. AI Lang: ${profile.language}, Caption Target: ${captionLang}`);
-                console.log(`[Captions] Text channel buffer: "${textChannelText.substring(0, 60)}..."`);
+                console.log(`[Captions] Turn end | AI: ${p.language} | UI: ${captionLang}`);
 
-                // Cancel any pending debounced translation — the full turn is done now
+                // Cancel any pending debounced translation
                 if (pendingTranslationTimerRef.current) {
                   clearTimeout(pendingTranslationTimerRef.current);
                   pendingTranslationTimerRef.current = null;
                 }
 
-                // PRIORITY 1: If languages differ, we MUST translate the audio transcript.
-                if (captionLang !== profile.language) {
+                if (captionLang !== p.language) {
                   const textToTranslate = fullAiText || lastKoreanTextRef.current;
                   lastKoreanTextRef.current = '';
                   if (textToTranslate) {
-                    console.log(`[Captions] ⚠️ Translating turn to ${captionLang}: "${textToTranslate.substring(0, 30)}..."`);
                     translateCaption(textToTranslate, captionLang);
                   }
                 } else {
                   // PRIORITY 2: Same language. Try text channel first, then raw audio transcript
                   const legendaMatch = textChannelText.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
                   if (legendaMatch && legendaMatch[1]?.trim()) {
-                    console.log(`[Captions] ✅ Using [[LEGENDA:]] from text channel directly.`);
                     showCaption(legendaMatch[1].trim());
                   } else {
-                    // Fallback to audio transcript (stripped of thinking tags)
                     showCaption(fullAiText || textChannelText);
                   }
                   lastKoreanTextRef.current = '';
@@ -921,6 +928,7 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 // Vision engagement: If 8 seconds pass after AI finishes and user hasn't talked
                 if (visionTimerRef.current) clearTimeout(visionTimerRef.current);
                 visionTimerRef.current = setTimeout(() => {
+                  const p = profileRef.current;
                   if (isConnected && !isUserTalkingRef.current) {
                     sessionPromise.then(session => {
                       const recentGestures = gestureLogRef.current
@@ -929,21 +937,24 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                         .join(', ');
 
                       const gestureHistory = recentGestures ? `\nHistórico de gestos recentes que você viu: ${recentGestures}.` : "";
+                      const needsTranslation = p.captionsEnabled && (p.captionLanguage ?? p.language) !== p.language;
 
                       const proactiveLegendaReminder = !needsTranslation
-                        ? `\n                        LEMBRE-SE: Sua resposta de texto deve ser exclusivamente no formato [[LEGENDA: <seu comentário em ${profile.language}>]]. Não escreva pensamentos.`
-                        : `\n                        LEMBRE-SE: Responda APENAS em ${profile.language} no áudio. Não escreva nada no canal de texto.`;
+                        ? `\n                        LEMBRE-SE: Sua resposta de texto deve ser exclusivamente no formato [[LEGENDA: <seu comentário em ${p.language}>]]. Não escreva pensamentos.`
+                        : `\n                        LEMBRE-SE: Responda APENAS em ${p.language} no áudio. Não escreva nada no canal de texto.`;
                       session.sendRealtimeInput({
-                        text: `[VISUAL OBSERVATION]: 8 seconds of silence. Look at the camera and make a funny comment about what the user is doing. ${gestureHistory}${proactiveLegendaReminder} [🔴 LANG-LOCK: Audio EXCLUSIVELY in ${profile.language}. No other language in audio.]`
+                        text: `[VISUAL OBSERVATION]: 8 seconds of silence. Look at the camera and make a funny comment about what the user is doing. ${gestureHistory}${proactiveLegendaReminder} [🔴 LANG-LOCK: Audio EXCLUSIVELY in ${p.language}. No other language in audio.]`
                       });
                     });
                   }
                 }, 8000);
               }
-            } else if (rawCaption && !isFinished && profile.captionsEnabled) {
+            } else if (rawCaption && !isFinished && profileRef.current.captionsEnabled) {
               // Real-time streaming interim captions
-              const captionLang = profile.captionLanguage ?? profile.language;
-              if (captionLang === profile.language) {
+              const p = profileRef.current;
+              const captionLang = p.captionLanguage ?? p.language;
+
+              if (captionLang === p.language) {
                 // Same language: show audio buffer directly (trying [[LEGENDA:]] first)
                 const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
                 if (interimLegenda && interimLegenda[1]?.trim()) {
@@ -952,12 +963,9 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   showCaption(captionBufferRef.current);
                 }
               } else {
-                // Different language (needsTranslation=true): do NOT show Korean interim.
-                // Accumulate Korean text in lastKoreanTextRef and schedule a debounced translation.
-                // This way the user only ever sees Portuguese, never Korean flashing.
+                // Different language — Debounce translation
                 lastKoreanTextRef.current = captionBufferRef.current;
 
-                // Debounce: if 1.5s pass without new text, auto-translate what we have so far
                 if (pendingTranslationTimerRef.current) clearTimeout(pendingTranslationTimerRef.current);
                 pendingTranslationTimerRef.current = window.setTimeout(() => {
                   const toTranslate = lastKoreanTextRef.current.trim();
