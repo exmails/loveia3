@@ -41,7 +41,13 @@ type AppState = 'SETUP' | 'CALLING' | 'WAITING' | 'INCOMING' | 'OUTBOUND_CALLING
 
 function App() {
   const [appState, setAppState] = useState<AppState>('SETUP');
-  const [profile, setProfile] = useState<PartnerProfile>(DEFAULT_PROFILE);
+  const [profile, setProfile] = useState<PartnerProfile>(() => ({
+    ...DEFAULT_PROFILE,
+    // Read language preferences from localStorage immediately (before Supabase loads)
+    language: (localStorage.getItem('pref_ai_language') as PlatformLanguage) || DEFAULT_PROFILE.language,
+    captionLanguage: (localStorage.getItem('pref_caption_language') as PlatformLanguage) || DEFAULT_PROFILE.captionLanguage,
+    captionsEnabled: localStorage.getItem('pref_captions_enabled') === 'true',
+  }));
   const [callReason, setCallReason] = useState<string>('initial');
   const [nextScheduledCall, setNextScheduledCall] = useState<ScheduledCall | null>(null);
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('GEMINI_API_KEY') || DEFAULT_GEMINI_API_KEY);
@@ -112,6 +118,14 @@ function App() {
       setCurrentUserProfile(null);
     }
   }, [user]);
+
+  // Persist language preferences to localStorage instantly whenever they change
+  // This ensures they survive page reloads even before Supabase responds
+  useEffect(() => {
+    localStorage.setItem('pref_ai_language', profile.language || PlatformLanguage.PT);
+    if (profile.captionLanguage) localStorage.setItem('pref_caption_language', profile.captionLanguage);
+    localStorage.setItem('pref_captions_enabled', String(profile.captionsEnabled ?? false));
+  }, [profile.language, profile.captionLanguage, profile.captionsEnabled]);
 
   useEffect(() => {
     localStorage.setItem('GEMINI_API_KEY', apiKey);
