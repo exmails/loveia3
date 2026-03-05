@@ -30,7 +30,9 @@ const DEFAULT_PROFILE: PartnerProfile = {
   currentPartnerNumber: '',
   currentPartnerNickname: '',
   isAiReceptionistEnabled: false,
-  ai_number: ''
+  ai_number: '',
+  captionsEnabled: false,
+  captionLanguage: PlatformLanguage.PT
 };
 
 const DEFAULT_GEMINI_API_KEY = "AIzaSyDNwhe9s8gdC2SnU2g2bOyBSgRmoE1ER3s";
@@ -97,15 +99,19 @@ function App() {
               // Ensure AI Number is synced
               settings.ai_number = data.ai_number || '';
 
-              // Merge with default to ensure all fields exist
-              setProfile(prev => ({ ...prev, ...settings }));
+              // Ensure caption fields are always preserved from bank (not overwritten by DEFAULT_PROFILE)
+              if (settings.captionsEnabled === undefined) settings.captionsEnabled = false;
+              if (settings.captionLanguage === undefined) settings.captionLanguage = settings.language || PlatformLanguage.PT;
+
+              // Merge: default first, then DB settings override (so no saved field is lost)
+              setProfile(() => ({ ...DEFAULT_PROFILE, ...settings }));
             }
           }
         });
     } else {
       setCurrentUserProfile(null);
     }
-  }, [user, appState === 'SETUP']);
+  }, [user]);
 
   useEffect(() => {
     localStorage.setItem('GEMINI_API_KEY', apiKey);
