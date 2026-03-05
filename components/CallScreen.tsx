@@ -52,6 +52,8 @@ export const CallScreen: React.FC<CallScreenProps> = ({ profile, callReason, onE
   const textChannelBufferRef = useRef<string>(''); // Captures AI text channel ([[LEGENDA:]]) separately from audio transcription
   const userCaptionBufferRef = useRef<string>('');
   const pendingTranslateRef = useRef<boolean>(false);
+  const lastKoreanTextRef = useRef<string>(''); // Accumulates full Korean text for debounced translation
+  const pendingTranslationTimerRef = useRef<number | null>(null); // Debounce timer for translation
 
   // Audio Levels for Visualization
   const [micLevel, setMicLevel] = useState(0);
@@ -883,16 +885,28 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 console.log(`[Captions] Turn finished. AI Lang: ${profile.language}, Caption Target: ${captionLang}`);
                 console.log(`[Captions] Text channel buffer: "${textChannelText.substring(0, 60)}..."`);
 
-                // PRIORITY 1: Try to extract [[LEGENDA:]] from AI text channel.
-                // The AI already wrote the translation there — use it directly, no extra API call needed.
+                // Cancel any pending debounced translation — the full turn is done now
+                if (pendingTranslationTimerRef.current) {
+                  clearTimeout(pendingTranslationTimerRef.current);
+                  pendingTranslationTimerRef.current = null;
+                }
+
+                // PRIORITY 1: Try to extract [[LEGENDA:]] from AI text channel (same-language captions)
                 const legendaMatch = textChannelText.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
                 if (legendaMatch && legendaMatch[1]?.trim()) {
                   console.log(`[Captions] ✅ Using [[LEGENDA:]] from text channel directly.`);
                   showCaption(legendaMatch[1].trim());
-                } else if (captionLang !== profile.language && fullAiText) {
-                  // PRIORITY 2: Text channel had no [[LEGENDA:]] — fall back to translating the audio transcript
-                  console.log(`[Captions] ⚠️ No [[LEGENDA:]] found, falling back to translateCaption.`);
-                  translateCaption(fullAiText, captionLang);
+                  lastKoreanTextRef.current = '';
+                } else if (captionLang !== profile.language) {
+                  // PRIORITY 2: Different language — translate the audio transcript.
+                  // Use fullAiText (from captionBufferRef) OR lastKoreanTextRef as fallback
+                  // (lastKoreanTextRef has the accumulated interim text if isTurnFinished fired early)
+                  const textToTranslate = fullAiText || lastKoreanTextRef.current;
+                  lastKoreanTextRef.current = '';
+                  if (textToTranslate) {
+                    console.log(`[Captions] ⚠️ Translating to ${captionLang}: "${textToTranslate.substring(0, 30)}..."`);
+                    translateCaption(textToTranslate, captionLang);
+                  }
                 } else {
                   // PRIORITY 3: Same language — just show the audio transcript (stripped)
                   showCaption(fullAiText || textChannelText);
@@ -932,12 +946,20 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                   showCaption(captionBufferRef.current);
                 }
               } else {
-                // Different language (needsTranslation=true): model no longer writes [[LEGENDA:]] in the text channel.
-                // Show the raw audio buffer as interim (in the AI's speaking language) for real-time feedback.
-                // When the turn finishes, translateCaption() will replace it with the correct language.
-                if (captionBufferRef.current.trim()) {
-                  showCaption(captionBufferRef.current);
-                }
+                // Different language (needsTranslation=true): do NOT show Korean interim.
+                // Accumulate Korean text in lastKoreanTextRef and schedule a debounced translation.
+                // This way the user only ever sees Portuguese, never Korean flashing.
+                lastKoreanTextRef.current = captionBufferRef.current;
+
+                // Debounce: if 1.5s pass without new text, auto-translate what we have so far
+                if (pendingTranslationTimerRef.current) clearTimeout(pendingTranslationTimerRef.current);
+                pendingTranslationTimerRef.current = window.setTimeout(() => {
+                  const toTranslate = lastKoreanTextRef.current.trim();
+                  if (toTranslate) {
+                    lastKoreanTextRef.current = '';
+                    translateCaption(toTranslate, captionLang);
+                  }
+                }, 1500);
               }
             }
             if (message.serverContent?.interrupted) {
