@@ -841,7 +841,8 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
 
             const isTurnFinished = (message.serverContent as any)?.outputAudioTranscription?.finished ||
               (message.serverContent as any)?.outputTranscription?.finished ||
-              (message.serverContent?.modelTurn && !audioPart); // If there's a turn without audio bits, it might be the end.
+              (message.serverContent as any)?.turnComplete || // Official Gemini Live turn-end signal
+              (message.serverContent?.modelTurn && !audioPart); // fallback: model turn with no audio part
 
             if (isTurnFinished && (captionBufferRef.current.trim() || textChannelBufferRef.current.trim())) {
               const fullAiText = captionBufferRef.current.trim(); // Audio transcription (in AI's language)
@@ -903,18 +904,25 @@ Categorias válidas: comportamento, emocao, ciume, humor, habito, preferencia, p
                 }, 8000);
               }
             } else if (rawCaption && !isFinished && profile.captionsEnabled) {
-              // Real-time streaming: only show interim captions when same language (no translation)
+              // Real-time streaming interim captions
               const captionLang = profile.captionLanguage ?? profile.language;
-              // For same-language captions, try [[LEGENDA:]] from text channel first, then audio buffer
               if (captionLang === profile.language) {
+                // Same language: show audio buffer directly (trying [[LEGENDA:]] first)
                 const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
                 if (interimLegenda && interimLegenda[1]?.trim()) {
                   showCaption(interimLegenda[1].trim());
                 } else {
                   showCaption(captionBufferRef.current);
                 }
+              } else {
+                // Different language: try [[LEGENDA:]] from text channel (AI already writes it in target language)
+                // This enables real-time French captions even before turn is officially finished
+                const interimLegenda = textChannelBufferRef.current.match(/\[\[LEGENDA:\s*([\s\S]*?)(?:\]\]|$)/i);
+                if (interimLegenda && interimLegenda[1]?.trim()) {
+                  showCaption(interimLegenda[1].trim());
+                }
+                // If no [[LEGENDA:]] yet in text channel, suppress interim (avoid flashing wrong-language text)
               }
-              // If different language, suppress interim — wait for full turn to get [[LEGENDA:]] from text channel
             }
             if (message.serverContent?.interrupted) {
               sourcesRef.current.forEach(s => s.stop());
